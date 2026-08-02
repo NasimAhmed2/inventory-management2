@@ -1,0 +1,238 @@
+<div class="modal fade"
+     id="productModal"
+     tabindex="-1"
+     aria-hidden="true">
+
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+
+        <div class="modal-content">
+
+            <form
+                id="productForm"
+                method="post"
+                data-create-url="{% url 'inventory_products' %}"
+                data-update-url-template="{% url 'product_update' 0 %}">
+
+                {% csrf_token %}
+
+                <div class="modal-header bg-primary text-white">
+
+                    <h5
+                        class="modal-title"
+                        id="productModalTitle">
+
+                        Add Product
+
+                    </h5>
+
+                    <button
+                        type="button"
+                        class="btn-close btn-close-white"
+                        data-bs-dismiss="modal">
+                    </button>
+
+                </div>
+
+                <div class="modal-body">
+
+                    <div class="row">
+
+                        <!-- Item Code -->
+
+                        <div class="col-md-6 mb-3">
+
+                            <label class="form-label">
+
+                                Item Code
+
+                            </label>
+
+                            <input
+                                id="item_code"
+                                name="item_code"
+                                type="text"
+                                class="form-control"
+                                required>
+
+                        </div>
+
+                        <!-- Item Name -->
+
+                        <div class="col-md-6 mb-3">
+
+                            <label class="form-label">
+
+                                Item Name
+
+                            </label>
+
+                            <input
+                                id="item_name"
+                                name="item_name"
+                                type="text"
+                                class="form-control"
+                                required>
+
+                        </div>
+
+                        <!-- Category -->
+
+                        <div class="col-md-6 mb-3">
+
+                            <label class="form-label">
+
+                                Category
+
+                            </label>
+
+                            <select
+                                id="category"
+                                name="category"
+                                class="form-select"
+                                required>
+
+                                <option value="">
+
+                                    Select Category
+
+                                </option>
+
+                                {% for category in category_hsn.keys %}
+
+                                <option value="{{ category }}">
+
+                                    {{ category }}
+
+                                </option>
+
+                                {% endfor %}
+
+                            </select>
+
+                        </div>
+
+                        <!-- HSN -->
+
+                        <div class="col-md-6 mb-3">
+
+                            <label class="form-label">
+
+                                HSN
+
+                            </label>
+
+                            <select
+                                id="hs_code"
+                                name="hs_code"
+                                class="form-select"
+                                required>
+
+                                <option value="">
+
+                                    Select HSN
+
+                                </option>
+
+                            </select>
+
+                        </div>
+
+                        <!-- Specification -->
+
+                        <div class="col-md-12 mb-3">
+
+                            <label class="form-label">
+
+                                Specification
+
+                            </label>
+
+                            <input
+                                id="specification"
+                                name="specification"
+                                type="text"
+                                class="form-control">
+
+                        </div>
+
+                        <!-- Unit -->
+
+                        <div class="col-md-6 mb-3">
+
+                            <label class="form-label">
+
+                                Unit
+
+                            </label>
+
+                            <select
+                                id="unit_of_measure"
+                                name="unit_of_measure"
+                                class="form-select">
+
+                                <option value="pcs">Pieces</option>
+                                <option value="nos">Numbers</option>
+                                <option value="box">Box</option>
+                                <option value="set">Set</option>
+                                <option value="kg">Kg</option>
+                                <option value="ltr">Litre</option>
+                                <option value="mtr">Meter</option>
+
+                            </select>
+
+                        </div>
+
+                        <!-- Reorder -->
+
+                        <div class="col-md-6 mb-3">
+
+                            <label class="form-label">
+
+                                Reorder Level
+
+                            </label>
+
+                            <input
+                                id="reorder_level"
+                                name="reorder_level"
+                                type="number"
+                                min="0"
+                                class="form-control"
+                                value="10">
+
+                        </div>
+
+                    </div>
+
+                </div>
+
+                <div class="modal-footer">
+
+                    <button
+                        type="button"
+                        class="btn btn-secondary"
+                        data-bs-dismiss="modal">
+
+                        Cancel
+
+                    </button>
+
+                    <button
+                        id="btnSaveProduct"
+                        class="btn btn-primary">
+
+                        <i class="fas fa-save"></i>
+
+                        Save Product
+
+                    </button>
+
+                </div>
+
+            </form>
+
+        </div>
+
+    </div>
+
+</div>

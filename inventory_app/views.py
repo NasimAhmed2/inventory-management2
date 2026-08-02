@@ -1,0 +1,1469 @@
+import os
+import re
+import uuid
+from datetime import datetime
+from decimal import Decimal
+from django.views.decorators.http import require_POST
+from django.conf import settings
+from django.contrib import messages
+from django.contrib.auth import authenticate, get_user_model, login, logout
+from django.core.exceptions import ValidationError
+from django.core.validators import validate_email
+from django.db.models import Q, Sum
+from django.http import FileResponse, Http404
+from django.core.paginator import Paginator
+from .models import Product, InventoryStock, InventoryMovement
+from django.utils import timezone
+from django.db import transaction
+from .models import (
+    Product, 
+    PurchaseInvoice, 
+    PurchaseLineItem, 
+    UserProfile, 
+    Vendor, 
+    ServiceReport,
+    Customer,
+    Ticket,
+)
+from .services import (
+    InventoryService, 
+    CustomerService, 
+    TicketService, 
+    ServiceReportService
+)
+
+from django.shortcuts import render, redirect, get_object_or_404
+import json
+from datetime import date
+from django.http import JsonResponse
+from django.contrib.auth.decorators import login_required
+
+from .forms import ProductForm
+from .constants import CATEGORY_HSN
+
+
+User = get_user_model()
+
+
+
+def generate_customer_code():
+
+    prefix = date.today().strftime("C%y%m")
+
+    last = (
+        Customer.objects
+        .filter(customer_code__startswith=prefix)
+        .order_by("-customer_code")
+        .first()
+    )
+
+    if last:
+
+        number = int(last.customer_code[-4:]) + 1
+
+    else:
+
+        number = 1
+
+    return f"{prefix}{number:04d}"
+
+def placeholder_view(request, page_title="Coming Soon"):
+    return render(request, "placeholder.html", {"page_title": page_title})
+
+
+def generate_vendor_code():
+    last_vendor = Vendor.objects.order_by('-id').first()
+    if not last_vendor or not last_vendor.vendor_code:
+        return "MI001"
+
+    match = re.search(r'(\d+)$', last_vendor.vendor_code.lower())
+    if match:
+        number = int(match.group(1)) + 1
+        return f"MI{number:03d}"
+    return "MI001"
+
+
+def generate_invoice_number(invoice_date):
+    prefix = invoice_date.strftime("PI%Y%m%d")
+    today_invoices = PurchaseInvoice.objects.filter(invoice_number__startswith=prefix).count()
+    return f"{prefix}{today_invoices + 1:03d}"
+
+
+
+
+def sales_customers(request):
+
+    customers = Customer.objects.all().order_by("customer_code")
+
+    search = request.GET.get("search", "").strip()
+
+    if search:
+
+        customers = customers.filter(
+
+            Q(customer_code__icontains=search) |
+
+            Q(name__icontains=search) |
+
+            Q(mobile__icontains=search) |
+
+            Q(email__icontains=search)
+
+        )
+
+    if request.method == "POST":
+
+        try:
+
+            with transaction.atomic():
+
+                customer_id = request.POST.get("customer_id")
+
+                if customer_id:
+
+                    CustomerService.update_customer(
+                        customer_id=customer_id,
+                        request=request,
+                    )
+
+                    messages.success(
+                        request,
+                        "Customer updated successfully."
+                    )
+
+                else:
+
+                    CustomerService.create_customer(
+                        request=request,
+                    )
+
+                    messages.success(
+                        request,
+                        "Customer created successfully."
+                    )
+
+        except Exception as e:
+
+            messages.error(
+                request,
+                str(e)
+            )
+
+        return redirect("sales_customers")
+
+    context = {
+
+        "customers": customers,
+
+        "search": search,
+
+    }
+
+    return render(
+        request,
+        "customers.html",
+        context,
+    )
+
+
+def customer_delete(request, pk):
+
+    if request.method == "POST":
+
+        customer = get_object_or_404(
+            Customer,
+            pk=pk
+        )
+
+        customer.delete()
+
+        messages.success(
+            request,
+            "Customer deleted successfully."
+        )
+
+    return redirect("sales_customers")
+
+# ==========================================================
+# Ticket List
+# ==========================================================
+
+@login_required
+def tickets(request):
+
+    tickets = TicketService.list_tickets(request)
+
+    context = {
+        "tickets": tickets,
+        "status": request.GET.get("status", "OPEN"),
+        "search": request.GET.get("search", ""),
+        "status_choices": Ticket.STATUS_CHOICES,
+        "ticket_device_types": Ticket.DEVICE_TYPES,
+    }
+
+    return render(request, "tickets.html", context)
+
+
+# ==========================================================
+# Create Ticket
+# ==========================================================
+
+@login_required
+def ticket_create(request):
+
+    if request.method != "POST":
+        return redirect("tickets")
+
+    try:
+        TicketService.create_ticket(request)
+
+        messages.success(
+            request,
+            "Ticket created successfully."
+        )
+
+    except Exception as e:
+
+        messages.error(
+            request,
+            str(e)
+        )
+
+    return redirect("tickets")
+
+
+# ==========================================================
+# Update Ticket
+# ==========================================================
+
+@login_required
+def ticket_update(request, pk):
+
+    if request.method != "POST":
+        return redirect("tickets")
+
+    try:
+
+        TicketService.update_ticket(
+            request=request,
+            ticket_id=pk,
+        )
+
+        messages.success(
+            request,
+            "Ticket updated successfully."
+        )
+
+    except Exception as e:
+
+        messages.error(
+            request,
+            str(e)
+        )
+
+    return redirect("tickets")
+
+
+# ==========================================================
+# Ticket Detail
+# ==========================================================
+
+@login_required
+def ticket_detail(request, pk):
+
+    context = TicketService.get_ticket_context(pk)
+
+    return render(
+        request,
+        "ticket_detail.html",
+        context,
+    )
+
+
+# ==========================================================
+# Close Ticket
+# ==========================================================
+
+@login_required
+def ticket_close(request, pk):
+
+    if request.method != "POST":
+        return redirect("tickets")
+
+    try:
+
+        TicketService.close_ticket(
+            ticket_id=pk,
+            user=request.user,
+        )
+
+        messages.success(
+            request,
+            "Ticket closed successfully."
+        )
+
+    except Exception as e:
+
+        messages.error(
+            request,
+            str(e)
+        )
+
+    return redirect("tickets")
+
+
+# ==========================================================
+# Delete Ticket
+# ==========================================================
+
+@login_required
+def ticket_delete(request, pk):
+
+    if request.method != "POST":
+        return redirect("tickets")
+
+    try:
+
+        TicketService.delete_ticket(pk)
+
+        messages.success(
+            request,
+            "Ticket deleted successfully."
+        )
+
+    except Exception as e:
+
+        messages.error(
+            request,
+            str(e)
+        )
+
+    return redirect("tickets")
+
+
+# ==========================================================
+# Print Ticket
+# ==========================================================
+
+@login_required
+def ticket_print(request, pk):
+
+    context = TicketService.get_print_context(pk)
+
+    return render(
+        request,
+        "ticket_print.html",
+        context,
+    )
+
+
+# ==========================================================
+# Customer Lookup (AJAX)
+# ==========================================================
+
+@login_required
+def customer_lookup(request):
+
+    mobile = request.GET.get("mobile", "").strip()
+
+    return JsonResponse(
+        TicketService.customer_lookup(mobile)
+    )
+
+
+def purchases_vendors(request):
+    query = request.GET.get("q", "").strip()
+    vendors = Vendor.objects.all()
+    if query:
+        vendors = vendors.filter(Q(vendor_code__icontains=query) | Q(name__icontains=query))
+
+    vendor_to_edit = None
+    edit_id = request.GET.get("edit")
+    if edit_id:
+        vendor_to_edit = Vendor.objects.filter(pk=edit_id).first()
+
+    if request.method == "POST":
+        vendor_id = request.POST.get("vendor_id")
+        vendor_code = request.POST.get("vendor_code", "").strip().lower()
+        name = request.POST.get("name", "").strip()
+        pan = request.POST.get("pan", "").strip()
+        vat_number = request.POST.get("vat_number", "").strip()
+        mobile = request.POST.get("mobile", "").strip()
+        email = request.POST.get("email", "").strip()
+        address = request.POST.get("address", "").strip()
+
+        if not name:
+            messages.error(request, "Vendor name is required.")
+        else:
+            if vendor_id:
+                vendor = Vendor.objects.get(pk=vendor_id)
+                vendor.name = name
+                vendor.pan = pan
+                vendor.vat_number = vat_number
+                vendor.mobile = mobile
+                vendor.email = email
+                vendor.address = address
+                if vendor_code:
+                    vendor.vendor_code = vendor_code
+                vendor.save()
+                messages.success(request, "Vendor updated successfully.")
+            else:
+                vendor_code = vendor_code or generate_vendor_code()
+                Vendor.objects.create(
+                    vendor_code=vendor_code,
+                    name=name,
+                    pan=pan,
+                    vat_number=vat_number,
+                    mobile=mobile,
+                    email=email,
+                    address=address,
+                )
+                messages.success(request, "Vendor created successfully.")
+        return redirect("purchases_vendors")
+
+    context = {
+        "vendors": vendors,
+        "query": query,
+        "vendor_to_edit": vendor_to_edit,
+        "next_vendor_code": generate_vendor_code(),
+    }
+    return render(request, "purchases_vendors.html", context)
+
+
+def purchases_invoices(request):
+    invoices = PurchaseInvoice.objects.select_related("vendor").prefetch_related("items")
+
+    if request.method == "POST":
+        with transaction.atomic():
+            vendor_id = request.POST.get("vendor")
+            invoice_date_value = request.POST.get("invoice_date")
+            credit_period = request.POST.get("credit_period", "0")
+            narration = request.POST.get("narration", "").strip()
+            invoice_number = request.POST.get("invoice_number", "").strip()
+            pdf_file = request.FILES.get("pdf_file")
+
+            if not vendor_id or not invoice_date_value:
+                messages.error(request, "Please select a vendor and invoice date.")
+                return redirect("purchases_invoices")
+
+            invoice_date = datetime.strptime(invoice_date_value, "%Y-%m-%d").date()
+            invoice_number = invoice_number or generate_invoice_number(invoice_date)
+            vendor = Vendor.objects.get(pk=vendor_id)
+
+            invoice = PurchaseInvoice.objects.create(
+                invoice_number=invoice_number,
+                vendor=vendor,
+                invoice_date=invoice_date,
+                credit_period=int(credit_period or 0),
+                narration=narration,
+            )
+
+            if pdf_file:
+                file_name = f"{uuid.uuid4().hex}_{pdf_file.name}"
+                file_path = os.path.join(settings.MEDIA_ROOT, "purchases", file_name)
+                os.makedirs(os.path.dirname(file_path), exist_ok=True)
+                with open(file_path, "wb+") as destination:
+                    for chunk in pdf_file.chunks():
+                        destination.write(chunk)
+                invoice.pdf_path = os.path.join("purchases", file_name)
+                invoice.save(update_fields=["pdf_path"])
+
+            line_categories = request.POST.getlist("item_category[]")
+            line_codes = request.POST.getlist("item_code[]")
+            line_names = request.POST.getlist("item_name[]")
+            line_specs = request.POST.getlist("item_specification[]")
+            line_quantities = request.POST.getlist("quantity[]")
+            line_rates = request.POST.getlist("rate[]")
+            line_hsn = request.POST.getlist("hsn[]")
+
+            line_totals = []
+            for index, item_code in enumerate(line_codes):
+                category = line_categories[index] if index < len(line_categories) else ""
+                quantity = line_quantities[index] if index < len(line_quantities) else "1"
+                rate = line_rates[index] if index < len(line_rates) else "0"
+                if not category or not item_code or not quantity or not rate:
+                    continue
+
+                product = Product.objects.filter(category=category, item_code=item_code).first()
+                if not product:
+                    continue
+
+                qty = int(quantity)
+                rate_value = Decimal(rate)
+                line_total = Decimal(qty) * rate_value
+                line_totals.append(line_total)
+
+                PurchaseLineItem.objects.create(
+                    invoice=invoice,
+                    item_name=product.item_name or line_names[index],
+                    item_code=product.item_code,
+                    specification=product.specification or line_specs[index],
+                    quantity=qty,
+                    rate=rate_value,
+                    line_total=line_total,
+                    hs_code=product.hs_code or line_hsn[index],
+                )
+
+                try:
+                    InventoryService.purchase(
+                        product=product,
+                        quantity=qty,
+                        unit_cost=rate_value,
+                        document_number=invoice,
+                        user=request.user,
+                        remarks=f"Purchase from {invoice.vendor.name}",
+                    )
+
+                except Exception as e:
+                    messages.error(request, str(e))
+                    raise
+
+            invoice.total_amount = sum(line_totals, Decimal("0"))
+            invoice.grand_total = invoice.total_amount
+            invoice.save(update_fields=["total_amount", "grand_total"])
+            messages.success(request, "Purchase invoice created successfully.")
+            return redirect("purchases_invoices")
+
+    products = Product.objects.all().order_by("category", "item_code")
+    product_categories = sorted({product.category for product in products if product.category})
+    context = {
+        "invoices": invoices,
+        "vendors": Vendor.objects.all().order_by("name"),
+        "products": products,
+        "product_categories": product_categories,
+    }
+    return render(request, "purchase_invoices.html", context)
+
+
+def purchase_invoice_pdf(request, invoice_id):
+    invoice = PurchaseInvoice.objects.filter(pk=invoice_id).first()
+    if not invoice or not invoice.pdf_path:
+        raise Http404("PDF not found")
+
+    file_path = os.path.join(settings.MEDIA_ROOT, invoice.pdf_path)
+    if not os.path.exists(file_path):
+        raise Http404("PDF not found")
+
+    return FileResponse(open(file_path, "rb"), content_type="application/pdf")
+
+
+def login_view(request):
+    if request.user.is_authenticated:
+        return redirect("home")
+
+    if request.method == "POST":
+        email = request.POST.get("email", "").strip()
+        password = request.POST.get("password", "")
+
+        user = authenticate(request, username=email, password=password)
+        if user is not None:
+            login(request, user)
+            messages.success(request, "Login successful.")
+            if user.is_superuser:
+                return redirect("home")
+            return redirect("login")
+
+        messages.error(request, "Invalid email or password.")
+
+    return render(request, "login.html")
+
+
+def signup_view(request):
+    if request.user.is_authenticated:
+        return redirect("home")
+
+    if request.method == "POST":
+        name = request.POST.get("name", "").strip()
+        email = request.POST.get("email", "").strip()
+        business_name = request.POST.get("business_name", "").strip()
+        mobile_number = request.POST.get("mobile_number", "").strip()
+        password = request.POST.get("password", "")
+        repeat_password = request.POST.get("repeat_password", "")
+
+        if not all([name, email, business_name, mobile_number, password, repeat_password]):
+            messages.error(request, "Please fill in all the required fields.")
+        elif password != repeat_password:
+            messages.error(request, "Passwords do not match.")
+        elif len(password) < 8:
+            messages.error(request, "Password must be at least 8 characters long.")
+        elif not mobile_number.isdigit() or len(mobile_number) < 10:
+            messages.error(request, "Please enter a valid mobile number.")
+        else:
+            try:
+                validate_email(email)
+            except ValidationError:
+                messages.error(request, "Please enter a valid email address.")
+                return render(request, "signup.html")
+
+            if User.objects.filter(email=email).exists():
+                messages.error(request, "A user with this email already exists.")
+            else:
+                user = User.objects.create_user(
+                    username=email,
+                    email=email,
+                    password=password,
+                    first_name=name,
+                )
+                user.is_superuser = True
+                user.is_staff = True
+                user.save()
+                UserProfile.objects.create(
+                    user=user,
+                    full_name=name,
+                    business_name=business_name,
+                    mobile_number=mobile_number,
+                )
+                messages.success(request, "Signup successful. Please login.")
+                return redirect("login")
+
+    return render(request, "signup.html")
+
+
+def logout_view(request):
+    logout(request)
+    messages.info(request, "You have been logged out.")
+    return redirect("login")
+
+@login_required
+def home(request):
+    if not request.user.is_authenticated:
+        return redirect("login")
+    if not request.user.is_superuser:
+        return redirect("login")
+    return render(request, "index.html")
+
+
+
+def inventory_products(request):
+    """
+    Product Listing + Create Product
+    """
+
+    search = request.GET.get("search", "").strip()
+
+    if request.method == "POST":
+
+        form = ProductForm(request.POST)
+
+        if form.is_valid():
+
+            product = form.save()
+
+            InventoryStock.objects.get_or_create(
+                product=product
+            )
+
+            messages.success(
+                request,
+                "Product added successfully."
+            )
+
+            return redirect("inventory_products")
+
+        else:
+
+            messages.error(
+                request,
+                "Please correct the highlighted errors."
+            )
+
+    else:
+
+        form = ProductForm()
+
+    products = Product.objects.all()
+
+    if search:
+
+        products = products.filter(
+            Q(item_code__icontains=search)
+            | Q(item_name__icontains=search)
+            | Q(category__icontains=search)
+            | Q(hs_code__icontains=search)
+        )
+
+    context = {
+
+        "page_title": "Products",
+
+        "products": products,
+
+        "search": search,
+
+        "category_hsn": CATEGORY_HSN,
+
+        "form": form,
+
+    }
+
+    return render(
+        request,
+        "products.html",
+        context,
+    )
+
+
+@require_POST
+def product_update(request, pk):
+    """
+    Update Existing Product
+    """
+
+    product = get_object_or_404(
+        Product,
+        pk=pk
+    )
+
+    form = ProductForm(
+        request.POST,
+        instance=product
+    )
+
+    if form.is_valid():
+
+        form.save()
+
+        messages.success(
+            request,
+            "Product updated successfully."
+        )
+
+    else:
+
+        messages.error(
+            request,
+            "Unable to update product."
+        )
+
+    return redirect("inventory_products")
+
+
+@require_POST
+def product_delete(request, pk):
+    """
+    Delete Product
+    """
+
+    product = get_object_or_404(
+        Product,
+        pk=pk
+    )
+
+    try:
+
+        product.delete()
+
+        messages.success(
+            request,
+            "Product deleted successfully."
+        )
+
+    except Exception:
+
+        messages.error(
+            request,
+            "Unable to delete product."
+        )
+
+    return redirect("inventory_products")
+
+
+
+
+def inventory_stock(request):
+    """
+    Inventory Stock Dashboard
+    """
+
+    search = request.GET.get("search", "").strip()
+    status = request.GET.get("status", "")
+
+    # ----------------------------------------------------
+    # Ensure every product has a stock record
+    # ----------------------------------------------------
+
+    for product in Product.objects.all():
+
+        InventoryStock.objects.get_or_create(
+            product=product,
+            defaults={
+                "quantity_on_hand": 0,
+                "quantity_reserved": 0,
+                "last_cost": Decimal("0.00"),
+            },
+        )
+
+    # ----------------------------------------------------
+    # Fetch Stock
+    # ----------------------------------------------------
+
+    stocks = (
+        InventoryStock.objects
+        .select_related("product")
+        .order_by("product__item_code")
+    )
+
+    # ----------------------------------------------------
+    # Search
+    # ----------------------------------------------------
+
+    if search:
+
+        stocks = stocks.filter(
+
+            Q(product__item_code__icontains=search) |
+            Q(product__item_name__icontains=search) |
+            Q(product__category__icontains=search)
+
+        )
+
+    # ----------------------------------------------------
+    # Build Dashboard Data
+    # ----------------------------------------------------
+
+    stock_rows = []
+
+    healthy = 0
+    low = 0
+    critical = 0
+
+    total_inventory_value = Decimal("0.00")
+
+    for stock in stocks:
+
+        available = stock.quantity_on_hand - stock.quantity_reserved
+
+        value = stock.quantity_on_hand * stock.last_cost
+
+        total_inventory_value += value
+
+        # -----------------------
+        # Status
+        # -----------------------
+
+        if stock.quantity_on_hand < 2:
+
+            stock_status = "Critical"
+
+            badge = "danger"
+
+            row = "table-danger"
+
+            critical += 1
+
+        elif stock.quantity_on_hand <= stock.product.reorder_level:
+
+            stock_status = "Low"
+
+            badge = "warning"
+
+            row = "table-warning"
+
+            low += 1
+
+        else:
+
+            stock_status = "Healthy"
+
+            badge = "success"
+
+            row = "table-success"
+
+            healthy += 1
+
+        stock_rows.append({
+
+            "id": stock.id,
+
+            "product": stock.product,
+
+            "on_hand": stock.quantity_on_hand,
+
+            "reserved": stock.quantity_reserved,
+
+            "available": available,
+
+            "last_cost": stock.last_cost,
+
+            "value": value,
+
+            "status": stock_status,
+
+            "badge": badge,
+
+            "row_class": row,
+
+            "updated_at": stock.updated_at,
+
+        })
+
+    # ----------------------------------------------------
+    # Status Filter
+    # ----------------------------------------------------
+
+    if status:
+
+        stock_rows = [
+
+            row for row in stock_rows
+
+            if row["status"].lower() == status.lower()
+
+        ]
+
+    # ----------------------------------------------------
+    # Pagination
+    # ----------------------------------------------------
+
+    paginator = Paginator(stock_rows, 20)
+
+    page_number = request.GET.get("page")
+
+    page_obj = paginator.get_page(page_number)
+
+    # ----------------------------------------------------
+    # Context
+    # ----------------------------------------------------
+
+    context = {
+
+        "page_title": "Stock Summary",
+
+        "page_obj": page_obj,
+
+        "search": search,
+
+        "status": status,
+
+        "total_products": Product.objects.count(),
+
+        "healthy_count": healthy,
+
+        "low_count": low,
+
+        "critical_count": critical,
+
+        "inventory_value": total_inventory_value,
+
+    }
+
+    return render(
+        request,
+        "stock_summary.html",
+        context,
+    )
+
+
+
+def inventory_movements(request):
+    """
+    Stock Movement Ledger
+    """
+
+    # =====================================================
+    # Filters
+    # =====================================================
+
+    search = request.GET.get("search", "").strip()
+    movement_type = request.GET.get("movement_type", "").strip()
+    product_id = request.GET.get("product", "").strip()
+    from_date = request.GET.get("from_date", "").strip()
+    to_date = request.GET.get("to_date", "").strip()
+
+    # =====================================================
+    # Base Query
+    # =====================================================
+
+    all_movements = (
+        InventoryMovement.objects
+        .select_related("product", "created_by")
+        .order_by("-movement_date", "-id")
+    )
+
+    # =====================================================
+    # Dashboard (Always Overall)
+    # =====================================================
+
+    today = timezone.localdate()
+
+    today_movements = all_movements.filter(
+        movement_date__date=today
+    )
+
+    incoming_qty = (
+        today_movements.filter(
+            movement_type__in=InventoryMovement.INCOMING_TYPES
+        ).aggregate(
+            total=Sum("quantity")
+        )["total"] or 0
+    )
+
+    outgoing_qty = (
+        today_movements.filter(
+            movement_type__in=InventoryMovement.OUTGOING_TYPES
+        ).aggregate(
+            total=Sum("quantity")
+        )["total"] or 0
+    )
+
+    today_count = today_movements.count()
+
+    # =====================================================
+    # Filtered Ledger
+    # =====================================================
+
+    movements = all_movements
+
+    if search:
+
+        movements = movements.filter(
+
+            Q(product__item_code__icontains=search)
+
+            |
+
+            Q(product__item_name__icontains=search)
+
+            |
+
+            Q(document_number__icontains=search)
+
+            |
+
+            Q(remarks__icontains=search)
+
+        )
+
+    if movement_type:
+
+        movements = movements.filter(
+
+            movement_type=movement_type
+
+        )
+
+    if product_id:
+
+        movements = movements.filter(
+
+            product_id=product_id
+
+        )
+
+    if from_date:
+
+        movements = movements.filter(
+
+            movement_date__date__gte=from_date
+
+        )
+
+    if to_date:
+
+        movements = movements.filter(
+
+            movement_date__date__lte=to_date
+
+        )
+
+    # =====================================================
+    # Pagination
+    # =====================================================
+
+    paginator = Paginator(
+
+        movements,
+
+        25,
+
+    )
+
+    page_obj = paginator.get_page(
+
+        request.GET.get("page")
+
+    )
+
+    # =====================================================
+    # Context
+    # =====================================================
+
+    context = {
+
+        "page_title": "Stock Movements",
+
+        "page_obj": page_obj,
+
+        "products": Product.objects.order_by("item_name"),
+
+        "movement_choices": InventoryMovement.MOVEMENT_TYPES,
+
+        "search": search,
+
+        "movement_type": movement_type,
+
+        "product_id": product_id,
+
+        "from_date": from_date,
+
+        "to_date": to_date,
+
+        # Dashboard
+
+        "today_count": today_count,
+
+        "incoming_qty": incoming_qty,
+
+        "outgoing_qty": outgoing_qty,
+
+        "net_qty": incoming_qty - outgoing_qty,
+
+    }
+
+    return render(
+        request,
+        "stock_movements.html",
+        context,
+    )
+
+
+# ==========================================================
+# Service Report List
+# ==========================================================
+
+@login_required
+def service_reports(request):
+
+    context = {
+
+        "pending_tickets": ServiceReportService.pending_tickets(request),
+
+        "reports": ServiceReportService.list_reports(request),
+
+        "search": request.GET.get("search", ""),
+
+        "ticket_status": request.GET.get("ticket_status", "OPEN"),
+
+        "report_status": request.GET.get("report_status", "ALL"),
+
+        "status_choices": ServiceReport.STATUS_CHOICES,
+
+        "products": Product.objects.order_by(
+            "category",
+            "item_name",
+        ),
+
+    }
+
+    return render(
+        request,
+        "service_reports.html",
+        context,
+    )
+
+
+# ==========================================================
+# Create
+# ==========================================================
+
+@login_required
+def service_report_create(request, ticket_id):
+
+    ticket = get_object_or_404(
+        Ticket.objects.select_related("customer"),
+        pk=ticket_id,
+    )
+
+    if request.method == "POST":
+
+        ServiceReportService.create_report(
+            request=request,
+            ticket=ticket,
+        )
+
+        messages.success(
+            request,
+            "Service report created successfully."
+        )
+
+        return redirect("service_reports")
+    products_json = []
+
+    for product in Product.objects.select_related("stock").order_by(
+        "category",
+        "item_name",
+    ):
+
+        products_json.append({
+            "id": product.id,
+            "category": product.category,
+            "item_name": product.item_name,
+            "item_code": product.item_code,
+            "specification": product.specification,
+            "selling_price": float(product.selling_price),
+            "available_stock": (
+                product.stock.quantity_available
+                if hasattr(product, "stock") else 0
+            ),
+        })
+
+    product_categories = sorted({
+        product.category
+        for product in Product.objects.all()
+        if product.category
+    })
+
+    context = {
+
+        "ticket": ticket,
+
+        "products": Product.objects.order_by(
+            "category",
+            "item_name",
+        ),
+        "product_categories": product_categories,
+        "products_json": json.dumps(products_json),
+    }
+
+    return render(
+        request,
+        "service_report_form.html",
+        context,
+    )
+
+
+@login_required
+def service_report_edit(request, pk):
+
+    report = get_object_or_404(
+        ServiceReport.objects.select_related(
+            "ticket",
+            "ticket__customer",
+        ),
+        pk=pk,
+    )
+
+    if request.method == "POST":
+
+        ServiceReportService.update_report(
+            request=request,
+            report_id=pk,
+        )
+
+        messages.success(
+            request,
+            "Service report updated successfully."
+        )
+
+        return redirect("service_reports")
+    products_json = []
+
+    for product in Product.objects.select_related("stock").order_by(
+        "category",
+        "item_name",
+    ):
+
+        products_json.append({
+            "id": product.id,
+            "category": product.category,
+            "item_name": product.item_name,
+            "item_code": product.item_code,
+            "specification": product.specification,
+            "selling_price": float(product.selling_price),
+            "available_stock": (
+                product.stock.quantity_available
+                if hasattr(product, "stock") else 0
+            ),
+        })
+
+    product_categories = sorted({
+        product.category
+        for product in Product.objects.all()
+        if product.category
+    })
+
+    context = {
+
+        "report": report,
+
+        "ticket": report.ticket,
+
+        "products": Product.objects.order_by(
+            "category",
+            "item_name",
+        ),
+        "product_categories": product_categories,
+        "products_json": json.dumps(products_json),
+    }
+
+    return render(
+        request,
+        "service_report_form.html",
+        context,
+    )
+
+# ==========================================================
+# Update
+# ==========================================================
+
+@login_required
+def service_report_update(request, pk):
+
+    if request.method != "POST":
+        return redirect("service_reports")
+
+    try:
+
+        ServiceReportService.update_report(
+            request=request,
+            report_id=pk,
+        )
+
+        messages.success(
+            request,
+            "Service report updated successfully."
+        )
+
+    except Exception as e:
+
+        messages.error(
+            request,
+            str(e)
+        )
+
+    return redirect("service_reports")
+
+
+# ==========================================================
+# Detail
+# ==========================================================
+
+@login_required
+def service_report_detail(request, pk):
+
+    context = ServiceReportService.get_report_context(pk)
+
+    return render(
+        request,
+        "service_report_detail.html",
+        context,
+    )
+
+
+# ==========================================================
+# Submit
+# ==========================================================
+
+@login_required
+def service_report_submit(request, pk):
+
+    if request.method != "POST":
+        return redirect("service_reports")
+
+    try:
+
+        ServiceReportService.submit_report(pk)
+
+        messages.success(
+            request,
+            "Service report submitted successfully."
+        )
+
+    except Exception as e:
+
+        messages.error(
+            request,
+            str(e)
+        )
+
+    return redirect("service_reports")
+
+
+# ==========================================================
+# Approve
+# ==========================================================
+
+@login_required
+def service_report_approve(request, pk):
+
+    if request.method != "POST":
+        return redirect("service_reports")
+
+    try:
+
+        ServiceReportService.approve_report(
+            report_id=pk,
+            user=request.user,
+        )
+
+        messages.success(
+            request,
+            "Service report approved successfully."
+        )
+
+    except Exception as e:
+
+        messages.error(
+            request,
+            str(e)
+        )
+
+    return redirect("service_reports")
+
+
+# ==========================================================
+# Reject
+# ==========================================================
+
+@login_required
+def service_report_reject(request, pk):
+
+    if request.method != "POST":
+        return redirect("service_reports")
+
+    try:
+
+        ServiceReportService.reject_report(pk)
+
+        messages.success(
+            request,
+            "Service report rejected successfully."
+        )
+
+    except Exception as e:
+
+        messages.error(
+            request,
+            str(e)
+        )
+
+    return redirect("service_reports")
+
+
+# ==========================================================
+# Complete
+# ==========================================================
+
+@login_required
+def service_report_complete(request, pk):
+
+    if request.method != "POST":
+        return redirect("service_reports")
+
+    try:
+
+        ServiceReportService.complete_report(pk)
+
+        messages.success(
+            request,
+            "Service report marked as completed."
+        )
+
+    except Exception as e:
+
+        messages.error(
+            request,
+            str(e)
+        )
+
+    return redirect("service_reports")

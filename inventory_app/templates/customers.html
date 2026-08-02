@@ -1,0 +1,420 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Customers{% endblock %}
+
+{% block content %}
+
+<div class="container-fluid">
+
+    <div class="card shadow-sm mb-3">
+
+        <div class="card-body">
+
+            <div class="row align-items-center">
+
+                <div class="col-md-8">
+
+                    <form method="get">
+
+                        <div class="input-group">
+
+                            <input
+                                type="text"
+                                class="form-control"
+                                name="search"
+                                placeholder="Search customer..."
+                                value="{{ search }}"
+                            >
+
+                            <button class="btn btn-primary">
+
+                                <i class="fas fa-search"></i>
+
+                                Search
+
+                            </button>
+
+                        </div>
+
+                    </form>
+
+                </div>
+
+                <div class="col-md-4 text-end">
+
+                    <button
+                        class="btn btn-success"
+                        data-bs-toggle="modal"
+                        data-bs-target="#customerModal"
+                        id="btnAddCustomer"
+                    >
+
+                        <i class="fas fa-plus"></i>
+
+                        Add Customer
+
+                    </button>
+
+                </div>
+
+            </div>
+
+        </div>
+
+    </div>
+
+    <div class="card shadow-sm">
+
+        <div class="card-header">
+
+            <strong>Customers</strong>
+
+        </div>
+
+        <div class="card-body p-0">
+
+            <div class="table-responsive">
+
+                <table class="table table-hover table-striped align-middle mb-0">
+
+                    <thead class="table-light">
+
+                        <tr>
+
+                            <th>Code</th>
+
+                            <th>Name</th>
+
+                            <th>Mobile</th>
+
+                            <th>Email</th>
+
+                            <th>Payment</th>
+
+                            <th>Credit Limit</th>
+
+                            <th width="140">Action</th>
+
+                        </tr>
+
+                    </thead>
+
+                    <tbody>
+
+                        {% for customer in customers %}
+
+                        <tr>
+
+                            <td>{{ customer.customer_code }}</td>
+
+                            <td>{{ customer.name }}</td>
+
+                            <td>{{ customer.mobile }}</td>
+
+                            <td>{{ customer.email }}</td>
+
+                            <td>{{ customer.get_payment_type_display }}</td>
+
+                            <td>{{ customer.credit_limit }}</td>
+
+                            <td>
+
+                                <button
+                                    class="btn btn-sm btn-outline-primary editCustomer"
+                                    data-id="{{ customer.id }}"
+                                    data-code="{{ customer.customer_code }}"
+                                    data-name="{{ customer.name }}"
+                                    data-mobile="{{ customer.mobile }}"
+                                    data-email="{{ customer.email }}"
+                                    data-address="{{ customer.address }}"
+                                    data-vat="{{ customer.vat_number }}"
+                                    data-payment="{{ customer.payment_type }}"
+                                    data-credit="{{ customer.credit_limit }}"
+                                >
+
+                                    <i class="fas fa-edit"></i>
+
+                                </button>
+
+                                <form
+                                    method="post"
+                                    action="{% url 'customer_delete' customer.id %}"
+                                    class="d-inline"
+                                >
+
+                                    {% csrf_token %}
+
+                                    <button
+                                        class="btn btn-sm btn-outline-danger"
+                                        onclick="return confirm('Delete customer?')"
+                                    >
+
+                                        <i class="fas fa-trash"></i>
+
+                                    </button>
+
+                                </form>
+
+                            </td>
+
+                        </tr>
+
+                        {% empty %}
+
+                        <tr>
+
+                            <td colspan="7" class="text-center py-4">
+
+                                No customers found.
+
+                            </td>
+
+                        </tr>
+
+                        {% endfor %}
+
+                    </tbody>
+
+                </table>
+
+            </div>
+
+        </div>
+
+    </div>
+
+</div>
+
+<!-- Customer Modal -->
+
+<div class="modal fade" id="customerModal">
+
+    <div class="modal-dialog modal-lg">
+
+        <div class="modal-content">
+
+            <form
+                method="post"
+                id="customerForm"
+                action="{% url 'sales_customers' %}"
+            >
+
+                {% csrf_token %}
+
+                <input
+                    type="hidden"
+                    name="customer_id"
+                    id="customer_id"
+                >
+
+                <div class="modal-header">
+
+                    <h5 id="customerModalTitle">
+
+                        Add Customer
+
+                    </h5>
+
+                    <button
+                        type="button"
+                        class="btn-close"
+                        data-bs-dismiss="modal"
+                    ></button>
+
+                </div>
+
+                <div class="modal-body">
+
+                    <div class="row">
+
+                        <div class="col-md-6">
+
+                            <label>Name</label>
+
+                            <input
+                                class="form-control"
+                                name="name"
+                                id="name"
+                                required
+                            >
+
+                        </div>
+
+                        <div class="col-md-6">
+
+                            <label>Mobile</label>
+
+                            <input
+                                class="form-control"
+                                name="mobile"
+                                id="mobile"
+                            >
+
+                        </div>
+
+                    </div>
+
+                    <div class="row mt-3">
+
+                        <div class="col-md-6">
+
+                            <label>Email</label>
+
+                            <input
+                                type="email"
+                                class="form-control"
+                                name="email"
+                                id="email"
+                            >
+
+                        </div>
+
+                        <div class="col-md-6">
+
+                            <label>VAT Number</label>
+
+                            <input
+                                class="form-control"
+                                name="vat_number"
+                                id="vat_number"
+                            >
+
+                        </div>
+
+                    </div>
+
+                    <div class="mt-3">
+
+                        <label>Address</label>
+
+                        <textarea
+                            class="form-control"
+                            rows="3"
+                            name="address"
+                            id="address"
+                        ></textarea>
+
+                    </div>
+
+                    <div class="row mt-3">
+
+                        <div class="col-md-6">
+
+                            <label>Payment Type</label>
+
+                            <select
+                                class="form-select"
+                                name="payment_type"
+                                id="payment_type"
+                            >
+
+                                <option value="cash">Cash</option>
+
+                                <option value="credit">Credit</option>
+
+                            </select>
+
+                        </div>
+
+                        <div class="col-md-6">
+
+                            <label>Credit Limit</label>
+
+                            <input
+                                type="number"
+                                class="form-control"
+                                name="credit_limit"
+                                id="credit_limit"
+                                value="0"
+                            >
+
+                        </div>
+
+                    </div>
+
+                </div>
+
+                <div class="modal-footer">
+
+                    <button
+                        type="button"
+                        class="btn btn-secondary"
+                        data-bs-dismiss="modal"
+                    >
+
+                        Cancel
+
+                    </button>
+
+                    <button
+                        class="btn btn-success"
+                    >
+
+                        Save Customer
+
+                    </button>
+
+                </div>
+
+            </form>
+
+        </div>
+
+    </div>
+
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+
+<script>
+
+document.addEventListener("DOMContentLoaded", function () {
+
+    const modal = new bootstrap.Modal(document.getElementById("customerModal"));
+
+    document.getElementById("btnAddCustomer").onclick = function () {
+
+        document.getElementById("customerForm").reset();
+
+        document.getElementById("customer_id").value = "";
+
+        document.getElementById("customerModalTitle").innerText = "Add Customer";
+
+    };
+
+    document.querySelectorAll(".editCustomer").forEach(function(btn){
+
+        btn.onclick=function(){
+
+            document.getElementById("customerModalTitle").innerText="Edit Customer";
+
+            document.getElementById("customer_id").value=this.dataset.id;
+
+            document.getElementById("name").value=this.dataset.name;
+
+            document.getElementById("mobile").value=this.dataset.mobile;
+
+            document.getElementById("email").value=this.dataset.email;
+
+            document.getElementById("address").value=this.dataset.address;
+
+            document.getElementById("vat_number").value=this.dataset.vat;
+
+            document.getElementById("payment_type").value=this.dataset.payment;
+
+            document.getElementById("credit_limit").value=this.dataset.credit;
+
+            modal.show();
+
+        };
+
+    });
+
+});
+
+</script>
+
+{% endblock %}

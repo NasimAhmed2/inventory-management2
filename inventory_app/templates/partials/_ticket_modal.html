@@ -1,0 +1,501 @@
+<div class="modal fade" id="ticketModal" tabindex="-1">
+
+    <div class="modal-dialog modal-xl">
+
+        <div class="modal-content">
+
+            <form
+                method="post"
+                action="{% url 'ticket_create' %}"
+                id="ticketForm"
+            >
+
+                {% csrf_token %}
+
+                <input
+                    type="hidden"
+                    name="customer_id"
+                    id="customer_id"
+                >
+
+                <div class="modal-header">
+
+                    <h5 class="modal-title">
+
+                        Create Ticket
+
+                    </h5>
+
+                    <button
+                        type="button"
+                        class="btn-close"
+                        data-bs-dismiss="modal"
+                    ></button>
+
+                </div>
+
+                <div class="modal-body">
+
+                    <!-- ===================================== -->
+                    <!-- Customer Lookup -->
+                    <!-- ===================================== -->
+
+                    <div class="card mb-3">
+
+                        <div class="card-header">
+
+                            <strong>Customer</strong>
+
+                        </div>
+
+                        <div class="card-body">
+
+                            <div class="row">
+
+                                <div class="col-md-4">
+
+                                    <label class="form-label">
+
+                                        Mobile Number *
+
+                                    </label>
+
+                                    <input
+                                        type="text"
+                                        class="form-control"
+                                        name="mobile"
+                                        id="mobile"
+                                        required
+                                    >
+
+                                </div>
+
+                            </div>
+
+                            <div
+                                id="existingCustomer"
+                                class="alert alert-success mt-3 d-none"
+                            >
+
+                                <strong>
+
+                                    Existing Customer Found
+
+                                </strong>
+
+                                <hr>
+
+                                <p class="mb-1">
+
+                                    <strong>Name :</strong>
+
+                                    <span id="existing_name"></span>
+
+                                </p>
+
+                                <p class="mb-1">
+
+                                    <strong>Email :</strong>
+
+                                    <span id="existing_email"></span>
+
+                                </p>
+
+                                <p class="mb-1">
+
+                                    <strong>Address :</strong>
+
+                                    <span id="existing_address"></span>
+
+                                </p>
+
+                            </div>
+
+                            <div
+                                id="newCustomerSection"
+                                class="mt-3 d-none"
+                            >
+
+                                <div class="row">
+
+                                    <div class="col-md-6">
+
+                                        <label class="form-label">
+
+                                            Customer Name *
+
+                                        </label>
+
+                                        <input
+                                            type="text"
+                                            class="form-control"
+                                            name="name"
+                                            id="name"
+                                        >
+
+                                    </div>
+
+                                    <div class="col-md-6">
+
+                                        <label class="form-label">
+
+                                            Email
+
+                                        </label>
+
+                                        <input
+                                            type="email"
+                                            class="form-control"
+                                            name="email"
+                                            id="email"
+                                        >
+
+                                    </div>
+
+                                </div>
+
+                                <div class="row mt-3">
+
+                                    <div class="col-md-8">
+
+                                        <label class="form-label">
+
+                                            Address
+
+                                        </label>
+
+                                        <textarea
+                                            class="form-control"
+                                            rows="2"
+                                            name="address"
+                                            id="address"
+                                        ></textarea>
+
+                                    </div>
+
+                                    <div class="col-md-4">
+
+                                        <label class="form-label">
+
+                                            VAT Number
+
+                                        </label>
+
+                                        <input
+                                            type="text"
+                                            class="form-control"
+                                            name="vat_number"
+                                        >
+
+                                    </div>
+
+                                </div>
+
+                                <div class="row mt-3">
+
+                                    <div class="col-md-4">
+
+                                        <label class="form-label">
+
+                                            Payment Type
+
+                                        </label>
+
+                                        <select
+                                            class="form-select"
+                                            name="payment_type"
+                                        >
+
+                                            <option value="cash">
+
+                                                Cash
+
+                                            </option>
+
+                                            <option value="credit">
+
+                                                Credit
+
+                                            </option>
+
+                                        </select>
+
+                                    </div>
+
+                                    <div class="col-md-4">
+
+                                        <label class="form-label">
+
+                                            Credit Limit
+
+                                        </label>
+
+                                        <input
+                                            type="number"
+                                            class="form-control"
+                                            name="credit_limit"
+                                            value="0"
+                                        >
+
+                                    </div>
+
+                                </div>
+
+                            </div>
+
+                        </div>
+
+                    </div>
+
+                    <!-- ===================================== -->
+                    <!-- Device -->
+                    <!-- ===================================== -->
+
+                    <div class="card mb-3">
+
+                        <div class="card-header">
+
+                            <strong>Device Details</strong>
+
+                        </div>
+
+                        <div class="card-body">
+
+                            <div class="row">
+
+                                <div class="col-md-3">
+
+                                    <label class="form-label">
+
+                                        Device Type *
+
+                                    </label>
+
+                                    <select
+                                        class="form-select"
+                                        name="device_type"
+                                        required
+                                    >
+
+                                        {% for value,label in ticket_device_types %}
+
+                                            <option value="{{ value }}">
+
+                                                {{ label }}
+
+                                            </option>
+
+                                        {% endfor %}
+
+                                    </select>
+
+                                </div>
+
+                                <div class="col-md-3">
+
+                                    <label class="form-label">
+
+                                        Brand
+
+                                    </label>
+
+                                    <input
+                                        type="text"
+                                        class="form-control"
+                                        name="brand"
+                                    >
+
+                                </div>
+
+                                <div class="col-md-3">
+
+                                    <label class="form-label">
+
+                                        Model
+
+                                    </label>
+
+                                    <input
+                                        type="text"
+                                        class="form-control"
+                                        name="model"
+                                    >
+
+                                </div>
+
+                                <div class="col-md-3">
+
+                                    <label class="form-label">
+
+                                        Serial No.
+
+                                    </label>
+
+                                    <input
+                                        type="text"
+                                        class="form-control"
+                                        name="serial_number"
+                                    >
+
+                                </div>
+
+                            </div>
+
+                            <div class="row mt-3">
+
+                                <div class="col-md-12">
+
+                                    <label class="form-label">
+
+                                        Accessories Received
+
+                                    </label>
+
+                                    <textarea
+                                        class="form-control"
+                                        rows="2"
+                                        name="accessories"
+                                    ></textarea>
+
+                                </div>
+
+                            </div>
+
+                        </div>
+
+                    </div>
+
+                    <!-- ===================================== -->
+                    <!-- Ticket -->
+                    <!-- ===================================== -->
+
+                    <div class="card">
+
+                        <div class="card-header">
+
+                            <strong>Issue Details</strong>
+
+                        </div>
+
+                        <div class="card-body">
+
+                            <div class="row">
+
+                                <div class="col-md-8">
+
+                                    <label class="form-label">
+
+                                        Issue Description *
+
+                                    </label>
+
+                                    <textarea
+                                        class="form-control"
+                                        rows="4"
+                                        name="issue_description"
+                                        required
+                                    ></textarea>
+
+                                </div>
+
+                                <div class="col-md-2">
+
+                                    <label class="form-label">
+
+                                        Priority
+
+                                    </label>
+
+                                    <select
+                                        class="form-select"
+                                        name="priority"
+                                    >
+
+                                        <option value="NORMAL">
+
+                                            Normal
+
+                                        </option>
+
+                                        <option value="URGENT">
+
+                                            Urgent
+
+                                        </option>
+
+                                    </select>
+
+                                </div>
+
+                                <div class="col-md-2">
+
+                                    <label class="form-label">
+
+                                        Delivery
+
+                                    </label>
+
+                                    <input
+                                        type="date"
+                                        class="form-control"
+                                        name="estimated_delivery"
+                                    >
+
+                                </div>
+
+                            </div>
+
+                            <div class="mt-3">
+
+                                <label class="form-label">
+
+                                    Remarks
+
+                                </label>
+
+                                <textarea
+                                    class="form-control"
+                                    rows="2"
+                                    name="remarks"
+                                ></textarea>
+
+                            </div>
+
+                        </div>
+
+                    </div>
+
+                </div>
+
+                <div class="modal-footer">
+
+                    <button
+                        type="button"
+                        class="btn btn-secondary"
+                        data-bs-dismiss="modal"
+                    >
+
+                        Cancel
+
+                    </button>
+
+                    <button
+                        type="submit"
+                        class="btn btn-success"
+                    >
+
+                        <i class="fas fa-save"></i>
+
+                        Create Ticket
+
+                    </button>
+
+                </div>
+
+            </form>
+
+        </div>
+
+    </div>
+
+</div>

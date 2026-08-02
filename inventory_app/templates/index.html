@@ -1,0 +1,141 @@
+{% extends 'base.html' %}
+
+{% block title %}Dashboard - Inventory Management{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row mb-4">
+        <div class="col-md-12">
+            <h1 class="h3 mb-3">
+                <i class="fas fa-chart-line"></i> Dashboard
+            </h1>
+        </div>
+    </div>
+
+    <!-- Key Statistics -->
+    <div class="row">
+        <div class="col-md-3">
+            <div class="stats-card">
+                <h5><i class="fas fa-box"></i> Total Products</h5>
+                <div class="value">0</div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="stats-card" style="border-left-color: #f093fb;">
+                <h5><i class="fas fa-building"></i> Total Vendors</h5>
+                <div class="value">0</div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="stats-card" style="border-left-color: #4facfe;">
+                <h5><i class="fas fa-users"></i> Total Customers</h5>
+                <div class="value">0</div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="stats-card" style="border-left-color: #43e97b;">
+                <h5><i class="fas fa-warehouse"></i> Stock Value</h5>
+                <div class="value">₹0</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row mt-4">
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="fas fa-chart-bar"></i> Recent Purchases
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <table class="table table-sm">
+                        <thead>
+                            <tr>
+                                <th>Invoice #</th>
+                                <th>Vendor</th>
+                                <th>Amount</th>
+                                <th>Date</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td colspan="4" class="text-center text-muted">No data available</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="fas fa-receipt"></i> Recent Sales
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <table class="table table-sm">
+                        <thead>
+                            <tr>
+                                <th>Invoice #</th>
+                                <th>Customer</th>
+                                <th>Amount</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td colspan="4" class="text-center text-muted">No data available</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row mt-4">
+        <div class="col-md-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="fas fa-exclamation-triangle"></i> Low Stock Items
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <table class="table table-sm">
+                        <thead>
+                            <tr>
+                                <th>Item Code</th>
+                                <th>Item Name</th>
+                                <th>Current Stock</th>
+                                <th>Reorder Level</th>
+                                <th>Action</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td colspan="5" class="text-center text-muted">No low stock items</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// Load dashboard data from API
+document.addEventListener('DOMContentLoaded', function() {
+    loadDashboardData();
+});
+
+function loadDashboardData() {
+    // This would fetch data from the API endpoints
+    // Example: fetch('/api/products/').then(...)
+}
+</script>
+{% endblock %}

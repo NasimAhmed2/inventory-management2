@@ -1,0 +1,361 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Tickets{% endblock %}
+
+{% block content %}
+
+<div class="container-fluid">
+
+    <!-- Header -->
+    <div class="card shadow-sm mb-3">
+
+        <div class="card-body">
+
+            <div class="row align-items-center">
+
+                <div class="col-md-8">
+
+                    <form method="get">
+
+                        <div class="row">
+
+                            <div class="col-md-5">
+
+                                <input
+                                    type="text"
+                                    name="search"
+                                    class="form-control"
+                                    placeholder="Search Ticket / Customer / Phone / Serial..."
+                                    value="{{ search }}"
+                                >
+
+                            </div>
+
+                            <div class="col-md-3">
+
+                                <select
+                                    name="status"
+                                    class="form-select"
+                                    onchange="this.form.submit()"
+                                >
+
+                                    <option value="ALL"
+                                        {% if status == "ALL" %}selected{% endif %}
+                                    >
+                                        All Tickets
+                                    </option>
+
+                                    {% for value,label in status_choices %}
+
+                                    <option
+                                        value="{{ value }}"
+                                        {% if value == status %}selected{% endif %}
+                                    >
+                                        {{ label }}
+                                    </option>
+
+                                    {% endfor %}
+
+                                </select>
+
+                            </div>
+
+                            <div class="col-md-2">
+
+                                <button
+                                    class="btn btn-primary w-100"
+                                >
+                                    Search
+                                </button>
+
+                            </div>
+
+                        </div>
+
+                    </form>
+
+                </div>
+
+                <div class="col-md-4 text-end">
+
+                    <button
+                        class="btn btn-success"
+                        data-bs-toggle="modal"
+                        data-bs-target="#ticketModal"
+                    >
+
+                        <i class="fas fa-plus"></i>
+
+                        Create Ticket
+
+                    </button>
+
+                </div>
+
+            </div>
+
+        </div>
+
+    </div>
+
+    <!-- Ticket List -->
+
+    <div class="card shadow-sm">
+
+        <div class="card-header">
+
+            <strong>Tickets</strong>
+
+        </div>
+
+        <div class="card-body p-0">
+
+            <div class="table-responsive">
+
+                <table class="table table-hover table-striped align-middle mb-0">
+
+                    <thead class="table-light">
+
+                    <tr>
+
+                        <th>Ticket</th>
+
+                        <th>Date</th>
+
+                        <th>Customer</th>
+
+                        <th>Phone</th>
+
+                        <th>Device</th>
+
+                        <th>Status</th>
+
+                        <th>Assigned</th>
+
+                        <th width="220">Actions</th>
+
+                    </tr>
+
+                    </thead>
+
+                    <tbody>
+
+                    {% for ticket in tickets %}
+
+                    <tr>
+
+                        <td>
+
+                            <strong>
+
+                                {{ ticket.ticket_number }}
+
+                            </strong>
+
+                        </td>
+
+                        <td>
+
+                            {{ ticket.created_at|date:"d M Y" }}
+
+                        </td>
+
+                        <td>
+
+                            {{ ticket.customer.name }}
+
+                        </td>
+
+                        <td>
+
+                            {{ ticket.customer.mobile }}
+
+                        </td>
+
+                        <td>
+
+                            <strong>
+
+                                {{ ticket.device_type }}
+
+                            </strong>
+
+                            <br>
+
+                            <small class="text-muted">
+
+                                {{ ticket.brand }}
+
+                                {{ ticket.model }}
+
+                            </small>
+
+                        </td>
+
+                        <td>
+
+                            {% if ticket.status == "OPEN" %}
+
+                                <span class="badge bg-success">
+
+                                    Open
+
+                                </span>
+
+                            {% elif ticket.status == "INSPECTION" %}
+
+                                <span class="badge bg-info">
+
+                                    Inspection
+
+                                </span>
+
+                            {% elif ticket.status == "ESTIMATE_PENDING" %}
+
+                                <span class="badge bg-warning text-dark">
+
+                                    Estimate Pending
+
+                                </span>
+
+                            {% elif ticket.status == "ESTIMATE_APPROVED" %}
+
+                                <span class="badge bg-primary">
+
+                                    Approved
+
+                                </span>
+
+                            {% elif ticket.status == "REPAIR_IN_PROGRESS" %}
+
+                                <span class="badge bg-secondary">
+
+                                    Repair
+
+                                </span>
+
+                            {% elif ticket.status == "READY_FOR_DELIVERY" %}
+
+                                <span class="badge bg-dark">
+
+                                    Ready
+
+                                </span>
+
+                            {% elif ticket.status == "DELIVERED" %}
+
+                                <span class="badge bg-success">
+
+                                    Delivered
+
+                                </span>
+
+                            {% else %}
+
+                                <span class="badge bg-danger">
+
+                                    Closed
+
+                                </span>
+
+                            {% endif %}
+
+                        </td>
+
+                        <td>
+
+                            {{ ticket.assigned_to }}
+
+                        </td>
+
+                        <td>
+
+                            <a
+                                href="{% url 'ticket_detail' ticket.id %}"
+                                class="btn btn-sm btn-outline-primary"
+                            >
+
+                                <i class="fas fa-eye"></i>
+
+                            </a>
+
+                            <button
+                                class="btn btn-sm btn-outline-warning edit-ticket"
+                                data-id="{{ ticket.id }}"
+                            >
+
+                                <i class="fas fa-edit"></i>
+
+                            </button>
+
+                            <form
+                                method="post"
+                                action="{% url 'ticket_close' ticket.id %}"
+                                class="d-inline"
+                            >
+
+                                {% csrf_token %}
+
+                                <button
+                                    class="btn btn-sm btn-outline-success"
+                                >
+
+                                    <i class="fas fa-check"></i>
+
+                                </button>
+
+                            </form>
+
+                            <a
+                                href="{% url 'ticket_print' ticket.id %}"
+                                target="_blank"
+                                class="btn btn-sm btn-outline-dark"
+                            >
+
+                                <i class="fas fa-print"></i>
+
+                            </a>
+
+                        </td>
+
+                    </tr>
+
+                    {% empty %}
+
+                    <tr>
+
+                        <td
+                            colspan="8"
+                            class="text-center py-4 text-muted"
+                        >
+
+                            No Tickets Found
+
+                        </td>
+
+                    </tr>
+
+                    {% endfor %}
+
+                    </tbody>
+
+                </table>
+
+            </div>
+
+        </div>
+
+    </div>
+
+</div>
+
+{% include "partials/_ticket_modal.html" %}
+
+{% endblock %}
+
+{% block extra_js %}
+
+<script src="{% static 'js/ticket.js' %}"></script>
+
+{% endblock %}

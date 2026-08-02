@@ -1,0 +1,185 @@
+{% extends 'base.html' %}
+
+{% block title %}Purchase Invoices{% endblock %}
+
+{% block content %}
+<div class="card shadow-sm mb-4">
+    <div class="card-body">
+        <h5 class="card-title">Create Purchase Invoice</h5>
+        <form method="post" enctype="multipart/form-data">
+            {% csrf_token %}
+            <div class="row g-3">
+                <div class="col-md-4">
+                    <label class="form-label">Vendor</label>
+                    <select class="form-select" name="vendor" required>
+                        <option value="">Select vendor</option>
+                        {% for vendor in vendors %}
+                        <option value="{{ vendor.id }}">{{ vendor.vendor_code }} - {{ vendor.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Invoice Date</label>
+                    <input type="date" class="form-control" name="invoice_date" required>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Credit Period</label>
+                    <input type="number" class="form-control" name="credit_period" value="0">
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label">PDF</label>
+                    <input type="file" class="form-control" name="pdf_file" accept="application/pdf">
+                </div>
+            </div>
+
+            <div class="mt-4">
+                <div class="table-responsive">
+                    <table class="table table-bordered" id="itemsTable">
+                        <thead>
+                            <tr>
+                                <th>Category</th>
+                                <th>Item Code</th>
+                                <th>Name</th>
+                                <th>Specification</th>
+                                <th>Qty</th>
+                                <th>Rate</th>
+                                <th>Line Total</th>
+                                <th>HSN</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td>
+                                    <select class="form-select item-category" name="item_category[]" required>
+                                        <option value="">Select</option>
+                                        {% for category in product_categories %}
+                                        <option value="{{ category }}">{{ category }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </td>
+                                <td>
+                                    <select class="form-select item-code" name="item_code[]" required>
+                                        <option value="">Select</option>
+                                        {% for product in products %}
+                                        <option value="{{ product.item_code }}" data-category="{{ product.category }}" data-name="{{ product.item_name }}" data-spec="{{ product.specification }}" data-hsn="{{ product.hs_code }}">{{ product.item_code }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </td>
+                                <td><input type="text" class="form-control item-name" name="item_name[]" readonly></td>
+                                <td><input type="text" class="form-control item-spec" name="item_specification[]" readonly></td>
+                                <td><input type="number" class="form-control quantity" name="quantity[]" value="1" min="1"></td>
+                                <td><input type="number" class="form-control rate" name="rate[]" value="0" step="0.01"></td>
+                                <td><input type="text" class="form-control line-total" readonly></td>
+                                <td><input type="text" class="form-control hsn" name="hsn[]" readonly></td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+                <button type="button" class="btn btn-outline-secondary" id="addRowBtn">Add Item</button>
+            </div>
+
+            <div class="mt-4">
+                <label class="form-label">Narration</label>
+                <textarea class="form-control" name="narration"></textarea>
+            </div>
+
+            <div class="mt-4 d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">Invoice Total: <span id="invoiceTotal">0.00</span></h5>
+                <button type="submit" class="btn btn-primary">Create Invoice</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div class="card shadow-sm">
+    <div class="card-body">
+        <h5 class="card-title">Purchase Invoice Records</h5>
+        <div class="table-responsive">
+            <table class="table table-striped">
+                <thead>
+                    <tr>
+                        <th>Invoice #</th>
+                        <th>Vendor</th>
+                        <th>Date</th>
+                        <th>Grand Total</th>
+                        <th>PDF</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for invoice in invoices %}
+                    <tr>
+                        <td>{{ invoice.invoice_number }}</td>
+                        <td>{{ invoice.vendor.name }}</td>
+                        <td>{{ invoice.invoice_date }}</td>
+                        <td>{{ invoice.grand_total }}</td>
+                        <td>
+                            {% if invoice.pdf_path %}
+                            <a class="btn btn-sm btn-outline-primary" href="{% url 'purchase_invoice_pdf' invoice.id %}" target="_blank">View PDF</a>
+                            {% else %}
+                            <span class="text-muted">No PDF</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr><td colspan="5" class="text-center text-muted">No purchase invoices yet.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    const tableBody = document.querySelector('#itemsTable tbody');
+
+    function updateTotals() {
+        let total = 0;
+        tableBody.querySelectorAll('tr').forEach(function (row) {
+            const qty = parseFloat(row.querySelector('.quantity').value || 0);
+            const rate = parseFloat(row.querySelector('.rate').value || 0);
+            const lineTotal = qty * rate;
+            row.querySelector('.line-total').value = lineTotal.toFixed(2);
+            total += lineTotal;
+        });
+        document.getElementById('invoiceTotal').textContent = total.toFixed(2);
+    }
+
+    function populateRowFromSelection(select) {
+        const row = select.closest('tr');
+        const option = select.selectedOptions[0];
+        if (!option) return;
+        row.querySelector('.item-name').value = option.getAttribute('data-name') || '';
+        row.querySelector('.item-spec').value = option.getAttribute('data-spec') || '';
+        row.querySelector('.hsn').value = option.getAttribute('data-hsn') || '';
+    }
+
+    tableBody.addEventListener('input', function (event) {
+        if (event.target.classList.contains('quantity') || event.target.classList.contains('rate')) {
+            updateTotals();
+        }
+    });
+
+    tableBody.addEventListener('change', function (event) {
+        if (event.target.classList.contains('item-code')) {
+            populateRowFromSelection(event.target);
+        }
+    });
+
+    document.getElementById('addRowBtn').addEventListener('click', function () {
+        const newRow = tableBody.firstElementChild.cloneNode(true);
+        newRow.querySelectorAll('input, select').forEach(function (field) {
+            if (field.tagName === 'INPUT') {
+                field.value = field.name === 'quantity[]' ? '1' : field.name === 'rate[]' ? '0' : '';
+            } else if (field.tagName === 'SELECT') {
+                field.selectedIndex = 0;
+            }
+        });
+        tableBody.appendChild(newRow);
+        updateTotals();
+    });
+
+    updateTotals();
+});
+</script>
+{% endblock %}

@@ -1,0 +1,273 @@
+<div class="card shadow-sm mb-4">
+
+    <div class="card-header bg-success text-white">
+
+        <h5 class="mb-0">
+
+            <i class="fas fa-file-invoice-dollar me-2"></i>
+
+            Charges & Estimate
+
+        </h5>
+
+    </div>
+
+    <div class="card-body">
+
+        <div class="row">
+
+            <!-- ======================================== -->
+            <!-- Charges -->
+            <!-- ======================================== -->
+
+            <div class="col-lg-6">
+
+                <div class="mb-3">
+
+                    <label class="form-label">
+
+                        Labour Charge
+
+                    </label>
+
+                    <input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        class="form-control estimate-field"
+                        name="labour_charge"
+                        id="labourCharge"
+                        value="{% if report %}{{ report.labour_charge }}{% else %}0{% endif %}"
+                    >
+
+                </div>
+
+                <div class="mb-3">
+
+                    <label class="form-label">
+
+                        Other Charges
+
+                    </label>
+
+                    <input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        class="form-control estimate-field"
+                        name="other_charge"
+                        id="otherCharge"
+                        value="{% if report %}{{ report.other_charge }}{% else %}0{% endif %}"
+                    >
+
+                </div>
+
+                <div class="mb-3">
+
+                    <label class="form-label">
+
+                        Technician Remarks
+
+                    </label>
+
+                    <textarea
+                        class="form-control"
+                        rows="5"
+                        name="remarks"
+                    >{% if report %}{{ report.remarks }}{% endif %}</textarea>
+
+                </div>
+
+            </div>
+
+            <!-- ======================================== -->
+            <!-- Estimate -->
+            <!-- ======================================== -->
+
+            <div class="col-lg-6">
+
+                <table class="table table-bordered">
+
+                    <tbody>
+
+                        <tr>
+
+                            <th width="60%">
+
+                                Parts Total
+
+                            </th>
+
+                            <td>
+
+                                <input
+                                    type="text"
+                                    id="partsTotal"
+                                    class="form-control text-end"
+                                    value="0.00"
+                                    readonly
+                                >
+
+                            </td>
+
+                        </tr>
+
+                        <tr>
+
+                            <th>
+
+                                Labour
+
+                            </th>
+
+                            <td>
+
+                                <input
+                                    type="text"
+                                    id="labourDisplay"
+                                    class="form-control text-end"
+                                    value="{% if report %}{{ report.labour_charge|floatformat:2 }}{% else %}0.00{% endif %}"
+                                    readonly
+                                >
+
+                            </td>
+
+                        </tr>
+
+                        <tr>
+
+                            <th>
+
+                                Other Charges
+
+                            </th>
+
+                            <td>
+
+                                <input
+                                    type="text"
+                                    id="otherDisplay"
+                                    class="form-control text-end"
+                                    value="{% if report %}{{ report.other_charge|floatformat:2 }}{% else %}0.00{% endif %}"
+                                    readonly
+                                >
+
+                            </td>
+
+                        </tr>
+
+                        <tr class="table-success">
+
+                            <th>
+
+                                Estimated Total
+
+                            </th>
+
+                            <td>
+
+                                <input
+                                    type="text"
+                                    id="estimatedTotal"
+                                    name="estimated_total"
+                                    class="form-control fw-bold text-end"
+                                    value="{% if report %}{{ report.estimated_total|floatformat:2 }}{% else %}0.00{% endif %}"
+                                    readonly
+                                >
+
+                            </td>
+
+                        </tr>
+
+                    </tbody>
+
+                </table>
+
+            </div>
+
+        </div>
+
+        <hr>
+
+        <div class="d-flex justify-content-end gap-2">
+
+            {% if report %}
+
+                {% if report.status == "DRAFT" %}
+
+                    <button
+                        type="submit"
+                        name="action"
+                        value="draft"
+                        class="btn btn-secondary"
+                    >
+
+                        <i class="fas fa-save"></i>
+
+                        Save Draft
+
+                    </button>
+
+                    <button
+                        type="submit"
+                        name="action"
+                        value="submit"
+                        class="btn btn-success"
+                    >
+
+                        <i class="fas fa-paper-plane"></i>
+
+                        Submit Report
+
+                    </button>
+
+                {% else %}
+
+                    <a
+                        href="{% url 'service_reports' %}"
+                        class="btn btn-primary"
+                    >
+
+                        <i class="fas fa-arrow-left"></i>
+
+                        Back
+
+                    </a>
+
+                {% endif %}
+
+            {% else %}
+
+                <button
+                    type="submit"
+                    name="action"
+                    value="draft"
+                    class="btn btn-secondary"
+                >
+
+                    <i class="fas fa-save"></i>
+
+                    Save Draft
+
+                </button>
+
+                <button
+                    type="submit"
+                    name="action"
+                    value="submit"
+                    class="btn btn-success"
+                >
+
+                    <i class="fas fa-paper-plane"></i>
+
+                    Submit Report
+
+                </button>
+
+            {% endif %}
+
+        </div>
+
+    </div>
+
+</div>

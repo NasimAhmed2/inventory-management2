@@ -1,0 +1,191 @@
+<div class="card shadow-sm mb-4">
+
+    <div class="card-header bg-primary text-white">
+
+        <h5 class="mb-0">
+
+            <i class="fas fa-ticket-alt me-2"></i>
+
+            Ticket Information
+
+        </h5>
+
+    </div>
+
+    <div class="card-body">
+
+        <div class="row g-3">
+
+            <div class="col-md-3">
+
+                <label class="form-label fw-bold">
+
+                    Ticket Number
+
+                </label>
+
+                <input
+                    type="text"
+                    class="form-control"
+                    value="{{ ticket.ticket_number }}"
+                    readonly
+                >
+
+            </div>
+
+            <div class="col-md-3">
+
+                <label class="form-label fw-bold">
+
+                    Customer
+
+                </label>
+
+                <input
+                    type="text"
+                    class="form-control"
+                    value="{{ ticket.customer.name }}"
+                    readonly
+                >
+
+            </div>
+
+            <div class="col-md-3">
+
+                <label class="form-label fw-bold">
+
+                    Mobile
+
+                </label>
+
+                <input
+                    type="text"
+                    class="form-control"
+                    value="{{ ticket.customer.mobile }}"
+                    readonly
+                >
+
+            </div>
+
+            <div class="col-md-3">
+
+                <label class="form-label fw-bold">
+
+                    Device Type
+
+                </label>
+
+                <input
+                    type="text"
+                    class="form-control"
+                    value="{{ ticket.device_type }}"
+                    readonly
+                >
+
+            </div>
+
+            <div class="col-md-3">
+
+                <label class="form-label fw-bold">
+
+                    Brand
+
+                </label>
+
+                <input
+                    type="text"
+                    class="form-control"
+                    value="{{ ticket.brand }}"
+                    readonly
+                >
+
+            </div>
+
+            <div class="col-md-3">
+
+                <label class="form-label fw-bold">
+
+                    Model
+
+                </label>
+
+                <input
+                    type="text"
+                    class="form-control"
+                    value="{{ ticket.model }}"
+                    readonly
+                >
+
+            </div>
+
+            <div class="col-md-3">
+
+                <label class="form-label fw-bold">
+
+                    Serial Number
+
+                </label>
+
+                <input
+                    type="text"
+                    class="form-control"
+                    value="{{ ticket.serial_number }}"
+                    readonly
+                >
+
+            </div>
+
+            <div class="col-md-3">
+
+                <label class="form-label fw-bold">
+
+                    Status
+
+                </label>
+
+                <input
+                    type="text"
+                    class="form-control"
+                    value="{{ ticket.get_status_display }}"
+                    readonly
+                >
+
+            </div>
+
+            <div class="col-md-12">
+
+                <label class="form-label fw-bold">
+
+                    Accessories Received
+
+                </label>
+
+                <textarea
+                    class="form-control"
+                    rows="2"
+                    readonly
+                >{{ ticket.accessories }}</textarea>
+
+            </div>
+
+            <div class="col-md-12">
+
+                <label class="form-label fw-bold">
+
+                    Customer Complaint
+
+                </label>
+
+                <textarea
+                    class="form-control"
+                    rows="4"
+                    readonly
+                >{{ ticket.issue_description }}</textarea>
+
+            </div>
+
+        </div>
+
+    </div>
+
+</div>

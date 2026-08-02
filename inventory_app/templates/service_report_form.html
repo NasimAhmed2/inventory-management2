@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}
+{% if report %}
+Edit Service Report
+{% else %}
+Create Service Report
+{% endif %}
+{% endblock %}
+
+{% block content %}
+
+<div class="container-fluid">
+
+    <form
+        method="post"
+        id="serviceReportForm"
+        {% if report %}
+            action="{% url 'service_report_edit' report.id %}"
+        {% else %}
+            action="{% url 'service_report_create' ticket.id %}"
+        {% endif %}
+    >
+
+        {% csrf_token %}
+
+        {% include "partials/_service_report_info.html" %}
+
+        {% include "partials/_service_report_inspection.html" %}
+
+        {% include "partials/_service_report_items.html" %}
+
+        {% include "partials/_service_report_charges.html" %}
+
+    </form>
+
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+
+<script>
+    const PRODUCTS = JSON.parse('{{ products_json|escapejs }}');
+</script>
+
+<script src="{% static 'js/service_report.js' %}"></script>
+
+{% endblock %}

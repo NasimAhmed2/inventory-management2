@@ -1,0 +1,15 @@
+# VS Code
+.vscode/
+
+# Media uploads
+media/
+
+# Django migrations (keep __init__.py)
+inventory_app/migrations/*
+!inventory_app/migrations/__init__.py
+
+# SQLite database
+db.sqlite3
+
+# Project reference/documentation
+ERP_PROJECT_REFERENCE.md

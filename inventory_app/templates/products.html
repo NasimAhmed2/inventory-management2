@@ -1,0 +1,226 @@
+{% extends 'base.html' %}
+
+{% load static %}
+
+{% block title %}Products{% endblock %}
+
+{% block content %}
+
+<div class="container-fluid">
+
+    <!-- Messages -->
+
+    {% if messages %}
+        {% for message in messages %}
+            <div class="alert alert-{{ message.tags }} alert-dismissible fade show auto-dismiss">
+                {{ message }}
+                <button class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+        {% endfor %}
+    {% endif %}
+
+    <div class="card shadow-sm">
+
+        <div class="card-header">
+
+            <div class="row align-items-center">
+
+                <div class="col-md-4">
+
+                    <h4 class="mb-0">
+
+                        <i class="fas fa-box"></i>
+
+                        Products
+
+                    </h4>
+
+                </div>
+
+                <div class="col-md-4">
+
+                    <form method="get">
+
+                        <div class="input-group">
+
+                            <input
+                                    type="text"
+                                    name="search"
+                                    value="{{ search }}"
+                                    class="form-control"
+                                    placeholder="Search Product">
+
+                            <button class="btn btn-primary">
+
+                                <i class="fas fa-search"></i>
+
+                            </button>
+
+                        </div>
+
+                    </form>
+
+                </div>
+
+                <div class="col-md-4 text-end">
+
+                    <button
+                            id="btnAddProduct"
+
+                            class="btn btn-success"
+
+                            data-bs-toggle="modal"
+
+                            data-bs-target="#productModal">
+
+                        <i class="fas fa-plus"></i>
+
+                        Add New Product
+
+                    </button>
+
+                </div>
+
+            </div>
+
+        </div>
+
+        <div class="card-body table-responsive">
+
+            <table class="table table-hover table-bordered align-middle">
+
+                <thead class="table-light">
+
+                <tr>
+
+                    <th width="120">Item Code</th>
+
+                    <th>Item Name</th>
+
+                    <th width="170">Category</th>
+
+                    <th width="110">HSN</th>
+
+                    <th>Specification</th>
+
+                    <th width="90">Unit</th>
+
+                    <th width="100">Reorder</th>
+
+                    <th width="140" class="text-center">
+
+                        Action
+
+                    </th>
+
+                </tr>
+
+                </thead>
+
+                <tbody>
+
+                {% for product in products %}
+
+                <tr>
+
+                    <td>{{ product.item_code }}</td>
+
+                    <td>{{ product.item_name }}</td>
+
+                    <td>{{ product.category }}</td>
+
+                    <td>{{ product.hs_code }}</td>
+
+                    <td>{{ product.specification }}</td>
+
+                    <td>{{ product.unit_of_measure }}</td>
+
+                    <td>{{ product.reorder_level }}</td>
+
+                    <td class="text-center">
+
+                        <button
+
+                                class="btn btn-warning btn-sm edit-product"
+
+                                data-id="{{ product.id }}"
+
+                                data-code="{{ product.item_code }}"
+
+                                data-name="{{ product.item_name }}"
+
+                                data-category="{{ product.category }}"
+
+                                data-hsn="{{ product.hs_code }}"
+
+                                data-specification="{{ product.specification }}"
+
+                                data-unit="{{ product.unit_of_measure }}"
+
+                                data-reorder="{{ product.reorder_level }}"
+
+                                data-bs-toggle="modal"
+
+                                data-bs-target="#productModal">
+
+                            <i class="fas fa-edit"></i>
+
+                        </button>
+
+                        <button
+
+                                class="btn btn-danger btn-sm delete-product"
+
+                                data-id="{{ product.id }}"
+
+                                data-name="{{ product.item_name }}"
+
+                                data-bs-toggle="modal"
+
+                                data-bs-target="#deleteModal">
+
+                            <i class="fas fa-trash"></i>
+
+                        </button>
+
+                    </td>
+
+                </tr>
+
+                {% empty %}
+
+                <tr>
+
+                    <td colspan="8" class="text-center">
+
+                        No products found.
+
+                    </td>
+
+                </tr>
+
+                {% endfor %}
+
+                </tbody>
+
+            </table>
+
+        </div>
+
+    </div>
+
+</div>
+
+{{ category_hsn|json_script:"category-data" }}
+
+<!-- Product Modal -->
+
+{% include "partials/_product_modal.html" %}
+
+<!-- Delete Modal -->
+
+{% include "partials/_delete_modal.html" %}
+
+<script src="{% static 'js/products.js' %}"></script>
+
+{% endblock %}

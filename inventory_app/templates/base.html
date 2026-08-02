@@ -1,0 +1,370 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    {% load static %}
+    <title>{% block title %}Inventory Management System{% endblock %}</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f8f9fa;
+        }
+        .sidebar {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px 0;
+            position: fixed;
+            top: 0;
+            bottom: 0;
+            width: 250px;
+            overflow-y: auto;
+            -webkit-overflow-scrolling: touch;
+        }
+        .sidebar a {
+            color: white;
+            text-decoration: none;
+            padding: 12px 20px;
+            display: block;
+            border-left: 3px solid transparent;
+            transition: all 0.3s;
+        }
+        .sidebar a:hover {
+            border-left-color: white;
+            background: rgba(255,255,255,0.1);
+        }
+        .sidebar a.active {
+            border-left-color: white;
+            background: rgba(255,255,255,0.2);
+        }
+        .sidebar .brand {
+            padding: 20px;
+            font-weight: bold;
+            font-size: 20px;
+            color: white;
+            border-bottom: 1px solid rgba(255,255,255,0.2);
+            margin-bottom: 20px;
+        }
+        .sidebar .nav-section {
+            padding-top: 15px;
+        }
+        .sidebar .nav-section-title {
+            padding: 10px 20px;
+            font-size: 12px;
+            text-transform: uppercase;
+            color: rgba(255,255,255,0.85);
+            font-weight: bold;
+            margin-top: 10px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            transition: background 0.2s ease;
+        }
+        .sidebar .nav-section-title:hover {
+            background: rgba(255,255,255,0.1);
+        }
+        .sidebar .nav-section.collapsed {
+            display: none;
+        }
+        .sidebar .toggle-icon {
+            font-size: 0.8rem;
+            transition: transform 0.2s ease;
+        }
+        .sidebar .nav-section-title.expanded .toggle-icon {
+            transform: rotate(180deg);
+        }
+        .main-content {
+            margin-left: 250px;
+            padding: 20px;
+        }
+        .navbar-custom {
+            background: white;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        .stats-card {
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+            border-left: 4px solid #667eea;
+        }
+        .stats-card h5 {
+            color: #666;
+            font-size: 14px;
+            text-transform: uppercase;
+            font-weight: 600;
+        }
+        .stats-card .value {
+            font-size: 24px;
+            font-weight: bold;
+            color: #333;
+            margin-top: 10px;
+        }
+        .btn-primary-custom {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border: none;
+        }
+        .btn-primary-custom:hover {
+            background: linear-gradient(135deg, #764ba2 0%, #667eea 100%);
+        }
+        .table-custom {
+            background: white;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        }
+        .badge-status {
+            padding: 5px 10px;
+            border-radius: 20px;
+        }
+        @media (max-width: 768px) {
+            .sidebar {
+                width: 100%;
+                height: auto;
+                position: relative;
+                min-height: auto;
+            }
+            .main-content {
+                margin-left: 0;
+            }
+        }
+    </style>
+    {% block extra_css %}{% endblock %}
+</head>
+<body>
+    <!-- Sidebar Navigation -->
+    <div class="sidebar">
+        <div class="brand">
+            <i class="fas fa-cube"></i> Microland IMS
+        </div>
+
+        {% if request.user.is_authenticated %}
+        <div class="nav-section">
+            <a href="{% url 'home' %}" class="{% if request.resolver_match.url_name == 'home' %}active{% endif %}">
+                <i class="fas fa-dashboard"></i> Dashboard
+            </a>
+        </div>
+
+        {% if request.user.is_superuser or user_role == 'superadmin' %}
+        <div class="nav-section-title nav-toggle{% if request.resolver_match.url_name == 'purchases_vendors' or request.resolver_match.url_name == 'purchases_invoices' %} expanded{% endif %}" data-target="section-purchases">
+            <span>Purchases</span>
+            <i class="fas fa-chevron-down toggle-icon"></i>
+        </div>
+        <div id="section-purchases" class="nav-section{% if request.resolver_match.url_name != 'purchases_vendors' and request.resolver_match.url_name != 'purchases_invoices' %} collapsed{% endif %}">
+            <a href="{% url 'purchases_vendors' %}" class="{% if request.resolver_match.url_name == 'purchases_vendors' %}active{% endif %}">
+                <i class="fas fa-building"></i> Vendors
+            </a>
+            <a href="{% url 'purchases_invoices' %}" class="{% if request.resolver_match.url_name == 'purchases_invoices' %}active{% endif %}">
+                <i class="fas fa-file-invoice"></i> Purchase Invoices
+            </a>
+        </div>
+
+        <div class="nav-section-title nav-toggle{% if request.resolver_match.url_name == 'inventory_products' or request.resolver_match.url_name == 'inventory_stock' or request.resolver_match.url_name == 'inventory_movements' %} expanded{% endif %}" data-target="section-inventory">
+            <span>Inventory</span>
+            <i class="fas fa-chevron-down toggle-icon"></i>
+        </div>
+        <div id="section-inventory" class="nav-section{% if request.resolver_match.url_name != 'inventory_products' and request.resolver_match.url_name != 'inventory_stock' and request.resolver_match.url_name != 'inventory_movements' %} collapsed{% endif %}">
+            <a href="{% url 'inventory_products' %}" class="{% if request.resolver_match.url_name == 'inventory_products' %}active{% endif %}">
+                <i class="fas fa-box"></i> Products
+            </a>
+            <a href="{% url 'inventory_stock' %}" class="{% if request.resolver_match.url_name == 'inventory_stock' %}active{% endif %}">
+                <i class="fas fa-warehouse"></i> Stock Summary
+            </a>
+            <a href="{% url 'inventory_movements' %}" class="{% if request.resolver_match.url_name == 'inventory_movements' %}active{% endif %}">
+                <i class="fas fa-exchange-alt"></i> Stock Movements
+            </a>
+        </div>
+
+        <div class="nav-section-title nav-toggle{% if request.resolver_match.url_name == 'sales_customers' or request.resolver_match.url_name == 'tickets' or request.resolver_match.url_name == 'service_reports' or request.resolver_match.url_name == 'sales_invoices' %} expanded{% endif %}" data-target="section-sales">
+            <span>Sales</span>
+            <i class="fas fa-chevron-down toggle-icon"></i>
+        </div>
+
+        <div id="section-sales" class="nav-section{% if request.resolver_match.url_name != 'sales_customers' and request.resolver_match.url_name != 'tickets' and request.resolver_match.url_name != 'service_reports' and request.resolver_match.url_name != 'sales_invoices' %} collapsed{% endif %}">
+
+            <a href="{% url 'sales_customers' %}" class="{% if request.resolver_match.url_name == 'sales_customers' %}active{% endif %}">
+                <i class="fas fa-users"></i> Customers
+            </a>
+
+            <a href="{% url 'tickets' %}" class="{% if request.resolver_match.url_name == 'tickets' %}active{% endif %}">
+                <i class="fas fa-ticket-alt"></i> Tickets
+            </a>
+
+            <a href="{% url 'service_reports' %}" class="{% if request.resolver_match.url_name == 'service_reports' %}active{% endif %}">
+                <i class="fas fa-tools"></i> Service Reports
+            </a>
+
+            <a href="{% url 'sales_invoices' %}" class="{% if request.resolver_match.url_name == 'sales_invoices' %}active{% endif %}">
+                <i class="fas fa-receipt"></i> Sales Invoices
+            </a>
+
+        </div>
+
+        <div class="nav-section-title nav-toggle{% if request.resolver_match.url_name == 'warehouse_locations' or request.resolver_match.url_name == 'warehouse_challans' %} expanded{% endif %}" data-target="section-warehouse">
+            <span>Warehouse</span>
+            <i class="fas fa-chevron-down toggle-icon"></i>
+        </div>
+        <div id="section-warehouse" class="nav-section{% if request.resolver_match.url_name != 'warehouse_locations' and request.resolver_match.url_name != 'warehouse_challans' %} collapsed{% endif %}">
+            <a href="{% url 'warehouse_locations' %}" class="{% if request.resolver_match.url_name == 'warehouse_locations' %}active{% endif %}">
+                <i class="fas fa-map-marker-alt"></i> Warehouses
+            </a>
+            <a href="{% url 'warehouse_challans' %}" class="{% if request.resolver_match.url_name == 'warehouse_challans' %}active{% endif %}">
+                <i class="fas fa-dolly"></i> Delivery Challans
+            </a>
+        </div>
+
+        <div class="nav-section-title nav-toggle{% if request.resolver_match.url_name == 'finance_entries' or request.resolver_match.url_name == 'finance_reports' %} expanded{% endif %}" data-target="section-finance">
+            <span>Finance</span>
+            <i class="fas fa-chevron-down toggle-icon"></i>
+        </div>
+        <div id="section-finance" class="nav-section{% if request.resolver_match.url_name != 'finance_entries' and request.resolver_match.url_name != 'finance_reports' %} collapsed{% endif %}">
+            <a href="{% url 'finance_entries' %}" class="{% if request.resolver_match.url_name == 'finance_entries' %}active{% endif %}">
+                <i class="fas fa-money-bill"></i> Finance Entries
+            </a>
+            <a href="{% url 'finance_reports' %}" class="{% if request.resolver_match.url_name == 'finance_reports' %}active{% endif %}">
+                <i class="fas fa-chart-bar"></i> Reports
+            </a>
+        </div>
+
+        <div class="nav-section-title">Admin</div>
+        <div class="nav-section">
+            <a href="{% url 'create_user' %}">
+                <i class="fas fa-user-plus"></i> Create User
+            </a>
+            <a href="/admin/">
+                <i class="fas fa-cogs"></i> Admin Panel
+            </a>
+        </div>
+        {% elif user_role == 'seller' %}
+        <div class="nav-section-title">Seller Access</div>
+        <div class="nav-section">
+            <a href="{% url 'purchases_vendors' %}">
+                <i class="fas fa-building"></i> Vendors
+            </a>
+            <a href="{% url 'purchases_invoices' %}">
+                <i class="fas fa-file-invoice"></i> Purchase Invoices
+            </a>
+            <a href="{% url 'sales_invoices' %}">
+                <i class="fas fa-receipt"></i> Sales Invoices
+            </a>
+        </div>
+        {% elif user_role == 'repairman' %}
+        <div class="nav-section-title">Repairs</div>
+        <div class="nav-section">
+            <a href="{% url 'home' %}">
+                <i class="fas fa-tools"></i> Repair Dashboard
+            </a>
+        </div>
+        {% endif %}
+        {% endif %}
+    </div>
+
+    <!-- Main Content -->
+    <div class="main-content">
+        <!-- Top Navigation Bar -->
+        <nav class="navbar navbar-expand-lg navbar-light navbar-custom">
+            <div class="container-fluid">
+                <a class="navbar-brand" href="#">
+                    <i class="fas fa-list-check"></i> Microland Inventory Management
+                </a>
+                <div class="ms-auto">
+                    {% if request.user.is_authenticated %}
+                    <div class="dropdown">
+                        <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" id="userMenu" data-bs-toggle="dropdown">
+                            <i class="fas fa-user"></i> {{ request.user.username }}
+                        </button>
+                        <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="userMenu">
+                            <li><span class="dropdown-item-text">Role: {{ user_role_display }}</span></li>
+                            {% if request.user.is_superuser or user_role == 'superadmin' %}
+                            <li><a class="dropdown-item" href="{% url 'create_user' %}">Create User</a></li>
+                            {% endif %}
+                            <li><hr class="dropdown-divider"></li>
+                            <li><a class="dropdown-item" href="{% url 'logout' %}">Logout</a></li>
+                        </ul>
+                    </div>
+                    {% else %}
+                    <a class="btn btn-sm btn-primary-custom" href="{% url 'login' %}">Login</a>
+                    {% endif %}
+                </div>
+            </div>
+        </nav>
+
+        <!-- Alert Messages -->
+        {% if messages %}
+        <div class="alert alert-info alert-dismissible fade show" role="alert">
+            {% for message in messages %}
+                {{ message }}
+            {% endfor %}
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+        {% endif %}
+
+        <!-- Page Content -->
+        {% block content %}{% endblock %}
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <!-- CSRF & API helper: use `apiFetch` for JSON requests (handles CSRF) -->
+    <script>
+    function getCookie(name) {
+        let cookieValue = null;
+        if (document.cookie && document.cookie !== '') {
+            const cookies = document.cookie.split(';');
+            for (let i = 0; i < cookies.length; i++) {
+                const cookie = cookies[i].trim();
+                if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                    cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                    break;
+                }
+            }
+        }
+        return cookieValue;
+    }
+
+    async function apiFetch(url, options = {}) {
+        options.headers = options.headers || {};
+        options.headers['Accept'] = 'application/json';
+        if (options.body && !(options.body instanceof FormData) && !options.headers['Content-Type']) {
+            options.headers['Content-Type'] = 'application/json';
+        }
+        // Add CSRF for unsafe methods
+        const method = (options.method || 'GET').toUpperCase();
+        if (['POST','PUT','PATCH','DELETE'].includes(method)) {
+            options.headers['X-CSRFToken'] = getCookie('csrftoken');
+        }
+        const res = await fetch(url, options);
+        const contentType = res.headers.get('content-type') || '';
+        if (contentType.includes('application/json')) {
+            const data = await res.json();
+            if (!res.ok) throw {status: res.status, data};
+            // If DRF pagination is enabled it returns {count,next,previous,results: [...]}
+            if (data && data.results !== undefined && Array.isArray(data.results)) {
+                return data.results;
+            }
+            return data;
+        }
+        if (!res.ok) throw {status: res.status, data: null};
+        return null;
+    }
+
+    document.addEventListener('DOMContentLoaded', function() {
+        document.querySelectorAll('.nav-toggle').forEach(function(toggle) {
+            toggle.addEventListener('click', function() {
+                var targetId = this.getAttribute('data-target');
+                var section = document.getElementById(targetId);
+                if (!section) return;
+                section.classList.toggle('collapsed');
+                this.classList.toggle('expanded');
+            });
+        });
+    });
+    </script>
+    {% block extra_js %}{% endblock %}
+</body>
+</html>
