@@ -1,66 +1,61 @@
 <div class="card shadow-sm mb-4">
 
-    <div class="card-header d-flex justify-content-between align-items-center">
 
-        <h5 class="mb-0">
+<div class="card-header d-flex justify-content-between align-items-center">
 
-            <i class="fas fa-microchip me-2"></i>
+    <h5 class="mb-0">
+        <i class="fas fa-microchip me-2"></i>
+        Required Spare Parts
+    </h5>
 
-            Required Spare Parts
+    <button
+        type="button"
+        class="btn btn-success btn-sm"
+        id="addItemRow"
+    >
+        <i class="fas fa-plus"></i>
+        Add Item
+    </button>
 
-        </h5>
+</div>
 
-        <button
-            type="button"
-            class="btn btn-success btn-sm"
-            id="addItemRow"
+<div class="card-body p-0">
+
+    <div class="table-responsive">
+
+        <table
+            class="table table-bordered mb-0"
+            id="itemsTable"
         >
 
-            <i class="fas fa-plus"></i>
-
-            Add Item
-
-        </button>
-
-    </div>
-
-    <div class="card-body p-0">
-
-        <div class="table-responsive">
-
-            <table class="table table-bordered mb-0" id="itemsTable">
-
-                <thead class="table-light">
+            <thead class="table-light">
 
                 <tr>
 
                     <th width="15%">Category</th>
-
-                    <th width="28%">Product</th>
-
-                    <th width="10%">Available</th>
-
+                    <th width="18%">Product</th>
+                    <th width="7%">Available</th>
                     <th width="8%">Qty</th>
-
                     <th width="12%">Rate</th>
-
+                    <th width="8%">Tax %</th>
+                    <th width="10%">Tax</th>
                     <th width="12%">Total</th>
-
                     <th width="15%">Remarks</th>
-
                     <th width="5%"></th>
 
                 </tr>
 
-                </thead>
+            </thead>
 
-                <tbody id="itemRows">
+            <tbody id="itemRows">
 
                 {% if report %}
 
                     {% for item in report.items.all %}
 
                     <tr>
+
+                        <!-- Category -->
 
                         <td>
 
@@ -69,18 +64,20 @@
                                 class="form-select category-select"
                             >
 
-                                <option value="">Select</option>
+                                <option value="">
+                                    Select
+                                </option>
 
                                 {% for category in product_categories %}
 
-                                <option
-                                    value="{{ category }}"
-                                    {% if category == item.product.category %}selected{% endif %}
-                                >
-
-                                    {{ category }}
-
-                                </option>
+                                    <option
+                                        value="{{ category }}"
+                                        {% if category == item.product.category %}
+                                            selected
+                                        {% endif %}
+                                    >
+                                        {{ category }}
+                                    </option>
 
                                 {% endfor %}
 
@@ -88,33 +85,47 @@
 
                         </td>
 
+
+                        <!-- Product -->
+
                         <td>
 
                             <select
-                                name="product[]"
+                                name="product_id[]"
                                 class="form-select product-select"
                             >
 
-                                <option value="{{ item.product.id }}">
+                                <option value="">
+                                    Select Product
+                                </option>
 
+                                <option
+                                    value="{{ item.product.id }}"
+                                    selected
+                                >
                                     {{ item.product.item_name }}
-
                                 </option>
 
                             </select>
 
                         </td>
 
+
+                        <!-- Available Stock -->
+
                         <td>
 
                             <input
                                 type="text"
                                 class="form-control stock-display"
-                                value="{{ item.product.stock.quantity_available }}"
+                                value="{{ item.product.stock.quantity_available|default:0 }}"
                                 readonly
                             >
 
                         </td>
+
+
+                        <!-- Quantity -->
 
                         <td>
 
@@ -128,28 +139,64 @@
 
                         </td>
 
+
+                        <!-- Rate -->
+
                         <td>
 
                             <input
                                 type="number"
                                 step="0.01"
+                                min="0"
                                 name="rate[]"
                                 class="form-control rate"
                                 value="{{ item.estimated_rate }}"
                             >
 
                         </td>
+                        <!-- Tax% -->
+                        <td>
+
+                            <input
+                                type="number"
+                                step="0.01"
+                                min="0"
+                                name="tax_percent[]"
+                                class="form-control tax-percent"
+                                value="{{ item.tax_percentage }}"
+                            >
+
+                        </td>
+                        <!-- Tax -->
+                        <td>
+
+                            <input
+                                type="number"
+                                step="0.01"
+                                min="0"
+                                name="tax[]"
+                                class="form-control tax"
+                                value="{{ item.tax_amount|floatformat:2 }}"
+                            >
+
+                        </td>
+
+
+                        <!-- Line Total -->
 
                         <td>
 
                             <input
                                 type="text"
                                 class="form-control line-total"
-                                value="{{ item.line_total }}"
+                                value="{{ item.line_total|floatformat:2 }}"
                                 readonly
                             >
 
                         </td>
+
+
+                        <!-- Remarks -->
 
                         <td>
 
@@ -161,6 +208,9 @@
                             >
 
                         </td>
+
+
+                        <!-- Remove -->
 
                         <td class="text-center">
 
@@ -181,16 +231,13 @@
 
                 {% endif %}
 
-                </tbody>
+            </tbody>
 
-            </table>
-
-        </div>
+        </table>
 
     </div>
 
 </div>
 
-<!-- Hidden Product Data -->
 
-{{ products_json|json_script:"products-data" }}
+</div>

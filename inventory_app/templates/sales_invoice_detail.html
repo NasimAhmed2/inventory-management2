@@ -1,0 +1,493 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}
+    Invoice {{ invoice.invoice_number }}
+{% endblock %}
+
+{% block content %}
+
+<div class="container-fluid">
+
+    <!-- ===================================================== -->
+    <!-- Header -->
+    <!-- ===================================================== -->
+
+    <div class="d-flex justify-content-between align-items-center mb-4">
+
+        <div>
+            <h4 class="mb-1">
+                Sales Invoice
+            </h4>
+
+            <div class="text-muted">
+                {{ invoice.invoice_number }}
+            </div>
+        </div>
+
+        <div class="d-flex gap-2">
+
+            <a
+                href="{% url 'sales_invoices' %}"
+                class="btn btn-outline-secondary"
+            >
+                <i class="fas fa-arrow-left"></i>
+                Back
+            </a>
+
+            <button
+                type="button"
+                onclick="window.print()"
+                class="btn btn-outline-primary"
+            >
+                <i class="fas fa-print"></i>
+                Print
+            </button>
+
+        </div>
+
+    </div>
+
+
+    <!-- ===================================================== -->
+    <!-- Invoice Information -->
+    <!-- ===================================================== -->
+
+    <div class="card shadow-sm mb-4">
+
+        <div class="card-body">
+
+            <div class="row">
+
+                <!-- Invoice -->
+
+                <div class="col-md-4">
+
+                    <h6 class="text-muted">
+                        Invoice Number
+                    </h6>
+
+                    <strong>
+                        {{ invoice.invoice_number }}
+                    </strong>
+
+                </div>
+
+
+                <!-- Date -->
+
+                <div class="col-md-4">
+
+                    <h6 class="text-muted">
+                        Invoice Date
+                    </h6>
+
+                    {{ invoice.invoice_date|date:"d-M-Y" }}
+
+                </div>
+
+
+                <!-- Status -->
+
+                <div class="col-md-4">
+
+                    <h6 class="text-muted">
+                        Status
+                    </h6>
+
+                    <span class="badge bg-success">
+                        {{ invoice.get_status_display }}
+                    </span>
+
+                </div>
+
+                <div class="col-md-4">
+
+                    <h6 class="text-muted">
+                        Mode of Payment
+                    </h6>
+
+                    <strong>
+                        {{ invoice.get_payment_mode_display }}
+                    </strong>
+
+                </div>
+
+            </div>
+
+        </div>
+
+    </div>
+
+
+    <!-- ===================================================== -->
+    <!-- Customer -->
+    <!-- ===================================================== -->
+
+    <div class="card shadow-sm mb-4">
+
+        <div class="card-header">
+
+            <h5 class="mb-0">
+                Customer
+            </h5>
+
+        </div>
+
+        <div class="card-body">
+
+            <div class="row">
+
+                <div class="col-md-4">
+
+                    <strong>
+                        Customer Code
+                    </strong>
+
+                    <div>
+                        {{ invoice.customer.customer_code }}
+                    </div>
+
+                </div>
+
+
+                <div class="col-md-4">
+
+                    <strong>
+                        Name
+                    </strong>
+
+                    <div>
+                        {{ invoice.customer.name }}
+                    </div>
+
+                </div>
+
+
+                <div class="col-md-4">
+
+                    <strong>
+                        Mobile
+                    </strong>
+
+                    <div>
+                        {{ invoice.customer.mobile }}
+                    </div>
+
+                </div>
+
+
+                <div class="col-md-6 mt-3">
+
+                    <strong>
+                        Email
+                    </strong>
+
+                    <div>
+                        {{ invoice.customer.email }}
+                    </div>
+
+                </div>
+
+
+                <div class="col-md-6 mt-3">
+
+                    <strong>
+                        VAT Number
+                    </strong>
+
+                    <div>
+                        {{ invoice.customer.vat_number }}
+                    </div>
+
+                </div>
+
+
+                <div class="col-md-12 mt-3">
+
+                    <strong>
+                        Address
+                    </strong>
+
+                    <div>
+                        {{ invoice.customer.address }}
+                    </div>
+
+                </div>
+
+            </div>
+
+        </div>
+
+    </div>
+
+
+    <!-- ===================================================== -->
+    <!-- Invoice Items -->
+    <!-- ===================================================== -->
+
+    <div class="card shadow-sm mb-4">
+
+        <div class="card-header">
+
+            <h5 class="mb-0">
+                Invoice Items
+            </h5>
+
+        </div>
+
+        <div class="card-body p-0">
+
+            <div class="table-responsive">
+
+                <table class="table table-bordered mb-0 align-middle">
+
+                    <thead class="table-light">
+
+                        <tr>
+
+                            <th width="50">
+                                #
+                            </th>
+
+                            <th>
+                                Item Code
+                            </th>
+
+                            <th>
+                                Item Name
+                            </th>
+
+                            <th>
+                                Specification
+                            </th>
+
+                            <th class="text-end">
+                                Qty
+                            </th>
+
+                            <th class="text-end">
+                                Rate
+                            </th>
+
+                            <th class="text-end">
+                                Tax %
+                            </th>
+
+                            <th class="text-end">
+                                Tax
+                            </th>
+
+                            <th class="text-end">
+                                Total
+                            </th>
+
+                        </tr>
+
+                    </thead>
+
+                    <tbody>
+
+                    {% for item in invoice.items.all %}
+
+                        <tr>
+
+                            <td>
+                                {{ forloop.counter }}
+                            </td>
+
+                            <td>
+                                {{ item.item_code }}
+                            </td>
+
+                            <td>
+                                {{ item.item_name }}
+                            </td>
+
+                            <td>
+                                {{ item.specification }}
+                            </td>
+
+                            <td class="text-end">
+                                {{ item.quantity }}
+                            </td>
+
+                            <td class="text-end">
+                                {{ item.rate|floatformat:2 }}
+                            </td>
+
+                            <td class="text-end">
+                                {{ item.tax_percentage|floatformat:2 }}%
+                            </td>
+
+                            <td class="text-end">
+                                {{ item.tax_amount|floatformat:2 }}
+                            </td>
+
+                            <td class="text-end">
+                                {{ item.line_total|floatformat:2 }}
+                            </td>
+
+                        </tr>
+
+                    {% empty %}
+
+                        <tr>
+
+                            <td
+                                colspan="9"
+                                class="text-center py-4"
+                            >
+                                No invoice items found.
+                            </td>
+
+                        </tr>
+
+                    {% endfor %}
+
+                    </tbody>
+
+                </table>
+
+            </div>
+
+        </div>
+
+    </div>
+
+
+    <!-- ===================================================== -->
+    <!-- Summary -->
+    <!-- ===================================================== -->
+
+    <div class="row justify-content-end">
+
+        <div class="col-md-5">
+
+            <div class="card shadow-sm">
+
+                <div class="card-body">
+
+                    <div class="d-flex justify-content-between mb-2">
+
+                        <span>
+                            Total Amount
+                        </span>
+
+                        <strong>
+                            {{ invoice.total_amount|floatformat:2 }}
+                        </strong>
+
+                    </div>
+
+
+                    <div class="d-flex justify-content-between mb-2">
+
+                        <span>
+                            Tax
+                        </span>
+
+                        <strong>
+                            {{ invoice.tax_amount|floatformat:2 }}
+                        </strong>
+
+                    </div>
+
+
+                    <div class="d-flex justify-content-between mb-2">
+
+                        <span>
+                            Discount
+                        </span>
+
+                        <strong>
+                            {{ invoice.discount_amount|floatformat:2 }}
+                        </strong>
+
+                    </div>
+
+
+                    <hr>
+
+
+                    <div class="d-flex justify-content-between">
+
+                        <strong>
+                            Net Amount
+                        </strong>
+
+                        <strong class="fs-5">
+
+                            {{ invoice.grand_total|floatformat:2 }}
+
+                        </strong>
+
+                    </div>
+
+                </div>
+
+            </div>
+
+        </div>
+
+    </div>
+
+
+    <!-- ===================================================== -->
+    <!-- Notes -->
+    <!-- ===================================================== -->
+
+    {% if invoice.notes %}
+
+    <div class="card shadow-sm mt-4 mb-5">
+
+        <div class="card-header">
+
+            <h6 class="mb-0">
+                Remarks
+            </h6>
+
+        </div>
+
+        <div class="card-body">
+
+            {{ invoice.notes|linebreaks }}
+
+        </div>
+
+    </div>
+
+    {% endif %}
+
+</div>
+
+
+<!-- ========================================================= -->
+<!-- Print CSS -->
+<!-- ========================================================= -->
+
+<style>
+
+@media print {
+
+    .btn,
+    nav,
+    .sidebar,
+    .navbar {
+        display: none !important;
+    }
+
+    body {
+        background: white !important;
+    }
+
+    .card {
+        box-shadow: none !important;
+        border: 1px solid #ddd !important;
+    }
+
+}
+
+</style>
+
+{% endblock %}

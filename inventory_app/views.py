@@ -24,12 +24,15 @@ from .models import (
     ServiceReport,
     Customer,
     Ticket,
+    SalesInvoice,
+    
 )
 from .services import (
     InventoryService, 
     CustomerService, 
     TicketService, 
-    ServiceReportService
+    ServiceReportService,
+    SaleService
 )
 
 from django.shortcuts import render, redirect, get_object_or_404
@@ -1467,3 +1470,435 @@ def service_report_complete(request, pk):
         )
 
     return redirect("service_reports")
+
+# ==========================================================
+# SALES INVOICES
+# ==========================================================
+
+@login_required
+def sales_invoices(request):
+
+    invoices = (
+        SalesInvoice.objects
+        .select_related(
+            "customer",
+            "service_report",
+            "service_report__ticket",
+        )
+        .prefetch_related("items")
+        .order_by("-invoice_date", "-id")
+    )
+
+    search = request.GET.get("search", "").strip()
+    sale_type = request.GET.get("sale_type", "ALL")
+    status = request.GET.get("status", "ALL")
+
+    if search:
+
+        invoices = invoices.filter(
+            Q(invoice_number__icontains=search)
+            | Q(customer__name__icontains=search)
+            | Q(customer__mobile__icontains=search)
+        )
+
+    if sale_type != "ALL":
+        invoices = invoices.filter(
+            sale_type=sale_type
+        )
+
+    if status != "ALL":
+        invoices = invoices.filter(
+            status=status
+        )
+
+    context = {
+        "invoices": invoices,
+        "search": search,
+        "sale_type": sale_type,
+        "status": status,
+        "sale_type_choices": SalesInvoice.SALE_TYPE_CHOICES,
+        "status_choices": SalesInvoice.STATUS_CHOICES,
+    }
+
+    return render(
+        request,
+        "sales_invoices.html",
+        context,
+    )
+
+@login_required
+def sales_invoice_create(request):
+
+    customers = Customer.objects.order_by("name")
+
+    products = (
+        Product.objects
+        .select_related("stock")
+        .order_by(
+            "category",
+            "item_name",
+        )
+    )
+
+    approved_reports = (
+        ServiceReport.objects
+        .filter(
+            status=ServiceReport.APPROVED,
+            sales_invoice__isnull=True,
+        )
+        .select_related(
+            "ticket",
+            "ticket__customer",
+            "technician",
+        )
+        .prefetch_related(
+            "items",
+            "items__product",
+        )
+        .order_by("-created_at")
+    )
+
+    products_json = []
+
+    for product in products:
+
+        try:
+            available_stock = (
+                product.stock.quantity_available
+            )
+        except InventoryStock.DoesNotExist:
+            available_stock = 0
+
+        products_json.append({
+            "id": product.id,
+            "category": product.category,
+            "item_code": product.item_code,
+            "item_name": product.item_name,
+            "specification": product.specification,
+            "selling_price": float(
+                product.selling_price
+            ),
+            "available_stock": available_stock,
+        })
+
+    context = {
+        "customers": customers,
+
+        "products": products,
+
+        "products_json": products_json,
+
+        "approved_reports": approved_reports,
+
+        "sale_type_choices": (
+            SalesInvoice.SALE_TYPE_CHOICES
+        ),
+    }
+
+    return render(
+        request,
+        "sales_invoice_form.html",
+        context,
+    )
+
+@login_required
+def sales_invoice_create_save(request):
+
+    if request.method != "POST":
+        return redirect("sales_invoice_create")
+
+    sale_type = request.POST.get(
+        "sale_type",
+        "DIRECT",
+    ).upper()
+
+    try:
+
+        # ==================================================
+        # DIRECT SALE
+        # ==================================================
+
+        if sale_type == "DIRECT":
+
+            customer_id = request.POST.get(
+                "customer"
+            )
+
+            if not customer_id:
+                raise ValueError(
+                    "Please select a customer."
+                )
+
+            customer = get_object_or_404(
+                Customer,
+                pk=customer_id,
+            )
+
+            invoice = SaleService.create_direct_sale(
+                customer=customer,
+                request=request,
+                user=request.user,
+            )
+
+        # ==================================================
+        # REPAIR SALE
+        # ==================================================
+
+        elif sale_type == "REPAIR":
+
+            service_report_id = request.POST.get(
+                "service_report"
+            )
+
+            if not service_report_id:
+                raise ValueError(
+                    "Please select a service report."
+                )
+
+            service_report = get_object_or_404(
+                ServiceReport.objects.select_related(
+                    "ticket",
+                    "ticket__customer",
+                ),
+                pk=service_report_id,
+            )
+
+            invoice = SaleService.create_repair_sale(
+                service_report=service_report,
+                request=request,
+                user=request.user,
+            )
+
+        # ==================================================
+        # SALE RETURN
+        # ==================================================
+
+        elif sale_type == "RETURN":
+
+            customer_id = request.POST.get(
+                "customer"
+            )
+
+            if not customer_id:
+                raise ValueError(
+                    "Please select a customer."
+                )
+
+            customer = get_object_or_404(
+                Customer,
+                pk=customer_id,
+            )
+
+            invoice = SaleService.create_sale_return(
+                customer=customer,
+                request=request,
+                user=request.user,
+            )
+
+        else:
+
+            raise ValueError(
+                "Invalid sale type."
+            )
+
+        messages.success(
+            request,
+            (
+                f"Sales invoice "
+                f"{invoice.invoice_number} "
+                f"created successfully."
+            ),
+        )
+
+        return redirect(
+            "sales_invoice_detail",
+            invoice_id=invoice.id,
+        )
+
+    except Exception as e:
+
+        messages.error(
+            request,
+            str(e),
+        )
+
+        return redirect(
+            "sales_invoice_create"
+        )
+
+
+@login_required
+def sales_invoice_detail(
+    request,
+    invoice_id,
+):
+
+    invoice = get_object_or_404(
+        SalesInvoice.objects
+        .select_related(
+            "customer",
+            "service_report",
+            "service_report__ticket",
+            "service_report__ticket__customer",
+            "service_report__technician",
+        )
+        .prefetch_related(
+            "items",
+            "service_report__items",
+            "service_report__items__product",
+        ),
+        pk=invoice_id,
+    )
+
+    context = {
+        "invoice": invoice,
+    }
+
+    return render(
+        request,
+        "sales_invoice_detail.html",
+        context,
+    )
+
+@login_required
+def sales_service_report_data(
+    request,
+    report_id,
+):
+
+    report = get_object_or_404(
+        ServiceReport.objects
+        .select_related(
+            "ticket",
+            "ticket__customer",
+            "technician",
+        )
+        .prefetch_related(
+            "items",
+            "items__product",
+        ),
+        pk=report_id,
+        status=ServiceReport.APPROVED,
+    )
+
+    if SalesInvoice.objects.filter(
+        service_report=report
+    ).exists():
+
+        return JsonResponse(
+            {
+                "success": False,
+                "message": (
+                    "This service report has "
+                    "already been invoiced."
+                ),
+            },
+            status=400,
+        )
+
+    items = []
+
+    for item in report.items.all():
+
+        items.append({
+            "product_id": item.product_id,
+            "item_code": item.item_code,
+            "item_name": item.item_name,
+            "specification": item.specification,
+            "quantity": item.quantity,
+            "rate": float(
+                item.estimated_rate
+            ),
+            "line_total": float(
+                item.line_total
+            ),
+            "remarks": item.remarks,
+        })
+
+    return JsonResponse({
+        "success": True,
+
+        "report": {
+            "id": report.id,
+            "report_number": report.report_number,
+
+            "ticket_id": report.ticket_id,
+
+            "ticket_number": (
+                report.ticket.ticket_number
+            ),
+
+            "customer_id": (
+                report.ticket.customer_id
+            ),
+
+            "customer_name": (
+                report.ticket.customer.name
+            ),
+
+            "customer_mobile": (
+                report.ticket.customer.mobile
+            ),
+
+            "inspection_notes": (
+                report.inspection_notes
+            ),
+
+            "problem_found": (
+                report.problem_found
+            ),
+
+            "repair_solution": (
+                report.repair_solution
+            ),
+
+            "labor_charge": float(
+                report.labor_charge
+            ),
+
+            "other_charge": float(
+                report.other_charge
+            ),
+
+            "estimated_total": float(
+                report.estimated_total
+            ),
+
+            "items": items,
+        },
+    })
+
+@login_required
+def sales_customer_search(request):
+
+    search = request.GET.get(
+        "search",
+        "",
+    ).strip()
+
+    customers = Customer.objects.all()
+
+    if search:
+
+        customers = customers.filter(
+            Q(name__icontains=search)
+            | Q(mobile__icontains=search)
+            | Q(customer_code__icontains=search)
+        )
+
+    data = []
+
+    for customer in customers[:50]:
+
+        data.append({
+            "id": customer.id,
+            "customer_code": customer.customer_code,
+            "name": customer.name,
+            "mobile": customer.mobile,
+            "address": customer.address,
+        })
+
+    return JsonResponse({
+        "success": True,
+        "customers": data,
+    })

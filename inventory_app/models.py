@@ -805,6 +805,9 @@ class ServiceReportItem(models.Model):
 
     quantity = models.PositiveIntegerField(default=1)
 
+    tax_percentage = models.DecimalField(max_digits=5, decimal_places=2, default=13)
+    tax_amount = models.DecimalField(max_digits=15, decimal_places=2, default=0)
+
     estimated_rate = models.DecimalField(
         max_digits=12,
         decimal_places=2,
@@ -827,7 +830,13 @@ class ServiceReportItem(models.Model):
 
     def save(self, *args, **kwargs):
 
-        self.line_total = self.quantity * self.estimated_rate
+        base_amount = self.quantity * self.estimated_rate
+
+        self.tax_amount = (
+            base_amount * self.tax_percentage / Decimal("100")
+        )
+
+        self.line_total = base_amount + self.tax_amount
 
         if self.product:
             self.item_code = self.product.item_code
@@ -838,29 +847,111 @@ class ServiceReportItem(models.Model):
 
 
 class SalesInvoice(models.Model):
-    STATUS_CHOICES = [
-        ('draft', 'Draft'),
-        ('confirmed', 'Confirmed'),
-        ('delivered', 'Delivered'),
-        ('invoiced', 'Invoiced'),
+
+    SALE_TYPE_CHOICES = [
+        ("DIRECT", "Direct Sale"),
+        ("REPAIR", "Repair Work"),
+        ("RETURN", "Sale Return"),
     ]
 
-    invoice_number = models.CharField(max_length=100, unique=True)
-    customer = models.ForeignKey(Customer, on_delete=models.PROTECT, related_name='invoices')
+    STATUS_CHOICES = [
+        ("draft", "Draft"),
+        ("confirmed", "Confirmed"),
+        ("delivered", "Delivered"),
+        ("invoiced", "Invoiced"),
+    ]
+
+    PAYMENT_MODE_CHOICES = [
+        ("cash", "Cash"),
+        ("upi", "UPI"),
+        ("card", "Card"),
+        ("credit", "Credit"),
+    ]
+
+    payment_mode = models.CharField(
+        max_length=20,
+        choices=PAYMENT_MODE_CHOICES,
+        default="cash",
+    )
+
+    invoice_number = models.CharField(
+        max_length=100,
+        unique=True,
+    )
+
+    customer = models.ForeignKey(
+        Customer,
+        on_delete=models.PROTECT,
+        related_name="invoices",
+    )
+
     invoice_date = models.DateField()
-    delivery_date = models.DateField(null=True, blank=True)
-    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='draft')
-    total_amount = models.DecimalField(max_digits=15, decimal_places=2, default=0)
-    tax_amount = models.DecimalField(max_digits=15, decimal_places=2, default=0)
-    discount_amount = models.DecimalField(max_digits=15, decimal_places=2, default=0)
-    grand_total = models.DecimalField(max_digits=15, decimal_places=2, default=0)
-    notes = models.TextField(blank=True)
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
+
+    delivery_date = models.DateField(
+        null=True,
+        blank=True,
+    )
+
+    sale_type = models.CharField(
+        max_length=20,
+        choices=SALE_TYPE_CHOICES,
+        default="DIRECT",
+    )
+
+    # Only used when sale_type == REPAIR
+    service_report = models.OneToOneField(
+        "ServiceReport",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="sales_invoice",
+    )
+
+    status = models.CharField(
+        max_length=20,
+        choices=STATUS_CHOICES,
+        default="draft",
+    )
+
+    total_amount = models.DecimalField(
+        max_digits=15,
+        decimal_places=2,
+        default=0,
+    )
+
+    tax_amount = models.DecimalField(
+        max_digits=15,
+        decimal_places=2,
+        default=0,
+    )
+
+    discount_amount = models.DecimalField(
+        max_digits=15,
+        decimal_places=2,
+        default=0,
+    )
+
+    grand_total = models.DecimalField(
+        max_digits=15,
+        decimal_places=2,
+        default=0,
+    )
+
+    notes = models.TextField(
+        blank=True,
+    )
+
+    created_at = models.DateTimeField(
+        auto_now_add=True,
+    )
+
+    updated_at = models.DateTimeField(
+        auto_now=True,
+    )
 
     class Meta:
-        ordering = ['-invoice_date']
-        db_table = 'sales_salesinvoice'
+        ordering = ["-invoice_date"]
+        db_table = "sales_salesinvoice"
 
     def __str__(self):
         return f"{self.invoice_number} - {self.customer.name}"

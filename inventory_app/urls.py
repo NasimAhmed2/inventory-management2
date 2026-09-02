@@ -32,15 +32,14 @@ urlpatterns = [
     path("sales/customers/", views.sales_customers, name="sales_customers"),
     path("customers/delete/<int:pk>/", views.customer_delete, name="customer_delete"),
 
-    path("sales/invoices/", views.placeholder_view, {"page_title": "Sales Invoices"}, name="sales_invoices"),
+    # path("sales/invoices/", views.placeholder_view, {"page_title": "Sales Invoices"}, name="sales_invoices"),
     path("warehouse/locations/", views.placeholder_view, {"page_title": "Warehouses"}, name="warehouse_locations"),
     path("warehouse/challans/", views.placeholder_view, {"page_title": "Delivery Challans"}, name="warehouse_challans"),
     path("finance/entries/", views.placeholder_view, {"page_title": "Finance Entries"}, name="finance_entries"),
     path("finance/reports/", views.placeholder_view, {"page_title": "Reports"}, name="finance_reports"),
     path("create-user/", views.placeholder_view, {"page_title": "Create User"}, name="create_user"),
 
-    path("sales_invoices/", views.placeholder_view, {"page_title": "Service Reports"}, name="service_reports"),
-
+    
     # ==========================================================
     # Tickets
     # ==========================================================
@@ -108,6 +107,54 @@ urlpatterns = [
         "service-reports/<int:pk>/complete/",
         views.service_report_complete,
         name="service_report_complete",
+    ),
+
+    # ==========================================================
+    # Sales Invoices
+    # ==========================================================
+
+    path(
+        "sales/invoices/",
+        views.sales_invoices,
+        name="sales_invoices",
+    ),
+
+    path(
+        "sales/invoices/new/",
+        views.sales_invoice_create,
+        name="sales_invoice_create",
+    ),
+
+    path(
+        "sales/invoices/create/",
+        views.sales_invoice_create_save,
+        name="sales_invoice_create_save",
+    ),
+
+    path(
+        "sales/invoices/<int:invoice_id>/",
+        views.sales_invoice_detail,
+        name="sales_invoice_detail",
+    ),
+
+    # ==========================================================
+    # Service Report → Repair Invoice
+    # ==========================================================
+
+    path(
+        "sales/service-report/<int:report_id>/data/",
+        views.sales_service_report_data,
+        name="sales_service_report_data",
+    ),
+
+    # ==========================================================
+    # Customer Search
+    # ==========================================================
+
+    path(
+        "sales/customers/search/",
+        views.sales_customer_search,
+        name="sales_customer_search",
     ),
 
 

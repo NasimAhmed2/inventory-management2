@@ -272,29 +272,25 @@
                                 <i class="fas fa-edit"></i>
                             </a>
 
+                            
                             <form
-
                                 method="post"
-
-                                action="{% url 'service_report_submit' report.id %}"
-
+                                action="{% url 'service_report_approve' report.id %}"
                                 class="d-inline"
-
                             >
-
                                 {% csrf_token %}
 
                                 <button
-
+                                    type="submit"
                                     class="btn btn-outline-success btn-sm"
-
+                                    {% if report.status == 'APPROVED' %}disabled{% endif %}
                                 >
-
-                                    Submit
-
+                                    <i class="fas fa-check"></i>
+                                    Approve
                                 </button>
-
                             </form>
+                            
+
 
                         </td>
 

@@ -1,0 +1,836 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}New Sale{% endblock %}
+
+{% block content %}
+
+<div class="container-fluid">
+
+    <!-- ===================================================== -->
+    <!-- PAGE HEADER -->
+    <!-- ===================================================== -->
+
+    <div class="d-flex justify-content-between align-items-center mb-4">
+
+        <div>
+            <h4 class="mb-1">
+                Create Sales Invoice
+            </h4>
+
+            <small class="text-muted">
+                Create direct sale, repair invoice or sale return
+            </small>
+        </div>
+
+        <a
+            href="{% url 'sales_invoices' %}"
+            class="btn btn-outline-secondary"
+        >
+            <i class="fas fa-arrow-left"></i>
+            Back
+        </a>
+
+    </div>
+
+
+    <form
+        method="post"
+        action="{% url 'sales_invoice_create_save' %}"
+        id="sales-invoice-form"
+    >
+
+        {% csrf_token %}
+
+
+        <!-- ================================================= -->
+        <!-- SALE TYPE -->
+        <!-- ================================================= -->
+
+        <div class="card shadow-sm mb-4">
+
+            <div class="card-header">
+
+                <h5 class="mb-0">
+                    Sale Type
+                </h5>
+
+            </div>
+
+            <div class="card-body">
+
+                <div class="row">
+
+                    <div class="col-md-6">
+
+                        <label class="form-label">
+                            Select Sale Type
+                            <span class="text-danger">*</span>
+                        </label>
+
+                        <select
+                            name="sale_type"
+                            id="sale-type"
+                            class="form-select form-select-lg"
+                            required
+                        >
+
+                            <option value="">
+                                -- Select Sale Type --
+                            </option>
+
+                            <option value="DIRECT">
+                                Direct Sale
+                            </option>
+
+                            <option value="REPAIR">
+                                Repair Work
+                            </option>
+
+                            <option value="RETURN">
+                                Sale Return
+                            </option>
+
+                        </select>
+
+                    </div>
+
+                </div>
+
+            </div>
+
+        </div>
+
+
+
+        <!-- ================================================= -->
+        <!-- CUSTOMER -->
+        <!-- ================================================= -->
+
+        <div
+            class="card shadow-sm mb-4"
+            id="customer-section"
+            style="display:none;"
+        >
+
+            <div class="card-header">
+
+                <h5 class="mb-0">
+                    Customer
+                </h5>
+
+            </div>
+
+            <div class="card-body">
+
+                <div class="row g-3">
+
+                    <div class="col-md-8">
+
+                        <label class="form-label">
+                            Customer
+                            <span class="text-danger">*</span>
+                        </label>
+
+                        <select
+                            name="customer"
+                            id="customer"
+                            class="form-select"
+                        >
+
+                            <option value="">
+                                -- Select Customer --
+                            </option>
+
+                            {% for customer in customers %}
+
+                            <option value="{{ customer.id }}">
+
+                                {{ customer.customer_code }}
+                                -
+                                {{ customer.name }}
+
+                                {% if customer.mobile %}
+                                    ({{ customer.mobile }})
+                                {% endif %}
+
+                            </option>
+
+                            {% endfor %}
+
+                        </select>
+
+                    </div>
+
+
+                    <div class="col-md-4">
+
+                        <label class="form-label">
+                            Customer Mobile
+                        </label>
+
+                        <input
+                            type="text"
+                            id="customer-mobile"
+                            class="form-control"
+                            readonly
+                        >
+
+                    </div>
+
+                    
+
+                </div>
+
+            </div>
+
+        </div>
+
+        <!-- ================================================= -->
+        <!-- Payment Mode -->
+        <!-- ================================================= -->
+
+        <div class="col-md-4">
+
+            <label class="form-label">
+                Mode of Payment
+                <span class="text-danger">*</span>
+            </label>
+
+            <select
+                name="payment_mode"
+                id="payment-mode"
+                class="form-select"
+                required
+            >
+
+                <option value="cash" selected>
+                    Cash
+                </option>
+
+                <option value="upi">
+                    UPI
+                </option>
+
+                <option value="card">
+                    Card
+                </option>
+
+                <option value="credit">
+                    Credit
+                </option>
+
+            </select>
+
+        </div>
+
+
+
+        <!-- ================================================= -->
+        <!-- REPAIR WORK -->
+        <!-- ================================================= -->
+
+        <div
+            class="card shadow-sm mb-4"
+            id="repair-section"
+            style="display:none;"
+        >
+
+            <div class="card-header">
+
+                <h5 class="mb-0">
+                    Service Report
+                </h5>
+
+            </div>
+
+            <div class="card-body">
+
+                <div class="row g-3">
+
+                    <div class="col-md-8">
+
+                        <label class="form-label">
+                            Approved Service Report
+                            <span class="text-danger">*</span>
+                        </label>
+
+                        <select
+                            name="service_report"
+                            id="service-report"
+                            class="form-select"
+                        >
+
+                            <option value="">
+                                -- Select Service Report --
+                            </option>
+
+                            {% for report in approved_reports %}
+
+                            <option
+                                value="{{ report.id }}"
+                            >
+
+                                {{ report.report_number }}
+
+                                -
+                                {{ report.ticket.ticket_number }}
+
+                                -
+                                {{ report.ticket.customer.name }}
+
+                            </option>
+
+                            {% endfor %}
+
+                        </select>
+
+                    </div>
+
+                </div>
+
+
+                <!-- Report information -->
+
+                <div
+                    id="repair-info"
+                    class="mt-4"
+                    style="display:none;"
+                >
+
+                    <div class="row g-3">
+
+                        <div class="col-md-3">
+
+                            <div class="border rounded p-3">
+
+                                <small class="text-muted">
+                                    Ticket
+                                </small>
+
+                                <div
+                                    id="repair-ticket"
+                                    class="fw-bold"
+                                >
+                                    -
+                                </div>
+
+                            </div>
+
+                        </div>
+
+
+                        <div class="col-md-3">
+
+                            <div class="border rounded p-3">
+
+                                <small class="text-muted">
+                                    Customer
+                                </small>
+
+                                <div
+                                    id="repair-customer"
+                                    class="fw-bold"
+                                >
+                                    -
+                                </div>
+
+                            </div>
+
+                        </div>
+
+
+                        <div class="col-md-3">
+
+                            <div class="border rounded p-3">
+
+                                <small class="text-muted">
+                                    Technician
+                                </small>
+
+                                <div
+                                    id="repair-technician"
+                                    class="fw-bold"
+                                >
+                                    -
+                                </div>
+
+                            </div>
+
+                        </div>
+
+
+                        <div class="col-md-3">
+
+                            <div class="border rounded p-3">
+
+                                <small class="text-muted">
+                                    Estimated Total
+                                </small>
+
+                                <div
+                                    id="repair-estimated-total"
+                                    class="fw-bold"
+                                >
+                                    0.00
+                                </div>
+
+                            </div>
+
+                        </div>
+
+                    </div>
+
+                </div>
+
+            </div>
+
+        </div>
+
+
+
+        <!-- ================================================= -->
+        <!-- DIRECT SALE / RETURN ITEMS -->
+        <!-- ================================================= -->
+
+        <div
+            class="card shadow-sm mb-4"
+            id="items-section"
+            style="display:none;"
+        >
+
+            <div class="card-header d-flex justify-content-between align-items-center">
+
+                <h5 class="mb-0">
+                    Items
+                </h5>
+
+                <button
+                    type="button"
+                    id="add-item"
+                    class="btn btn-primary btn-sm"
+                >
+                    <i class="fas fa-plus"></i>
+                    Add Item
+                </button>
+
+            </div>
+
+
+            <div class="card-body p-0">
+
+                <div class="table-responsive">
+
+                    <table
+                        class="table table-bordered align-middle mb-0"
+                        id="sale-items-table"
+                    >
+
+                        <thead class="table-light">
+
+                        <tr>
+
+                            <th width="170">
+                                Category
+                            </th>
+
+                            <th width="180">
+                                Item Code
+                            </th>
+
+                            <th>
+                                Item Name
+                            </th>
+
+                            <th width="100">
+                                Qty
+                            </th>
+
+                            <th width="130">
+                                Rate
+                            </th>
+
+                            <th width="100">
+                                Tax %
+                            </th>
+
+                            <th width="130">
+                                Tax
+                            </th>
+
+                            <th width="140">
+                                Amount
+                            </th>
+
+                            <th width="60">
+                            </th>
+
+                        </tr>
+
+                        </thead>
+
+
+                        <tbody id="sale-items-body">
+
+                        </tbody>
+
+                    </table>
+
+                </div>
+
+            </div>
+
+        </div>
+
+
+
+        <!-- ================================================= -->
+        <!-- REPAIR INVOICE PREVIEW -->
+        <!-- ================================================= -->
+
+        <div
+            class="card shadow-sm mb-4"
+            id="repair-invoice-section"
+            style="display:none;"
+        >
+
+            <div class="card-header">
+
+                <h5 class="mb-0">
+                    Repair Invoice Preview
+                </h5>
+
+            </div>
+
+
+            <div class="card-body">
+
+                <div class="table-responsive">
+
+                    <table
+                        class="table table-bordered align-middle"
+                    >
+
+                        <thead class="table-light">
+
+                        <tr>
+
+                            <th>
+                                Item
+                            </th>
+
+                            <th>
+                                Specification
+                            </th>
+
+                            <th width="100">
+                                Qty
+                            </th>
+
+                            <th width="140">
+                                Rate
+                            </th>
+
+                            <th width="140">
+                                Amount
+                            </th>
+
+                        </tr>
+
+                        </thead>
+
+                        <tbody id="repair-items-body">
+                        </tbody>
+
+                    </table>
+
+                </div>
+
+
+                <!-- Repair charges -->
+
+                <div class="row justify-content-end mt-3">
+
+                    <div class="col-md-5">
+
+                        <table class="table table-sm">
+
+                            <tr>
+
+                                <td>
+                                    Parts Total
+                                </td>
+
+                                <td class="text-end">
+
+                                    <span id="repair-parts-total">
+                                        0.00
+                                    </span>
+
+                                </td>
+
+                            </tr>
+
+                            <tr>
+
+                                <td>
+                                    Labour
+                                </td>
+
+                                <td class="text-end">
+
+                                    <span id="repair-labor">
+                                        0.00
+                                    </span>
+
+                                </td>
+
+                            </tr>
+
+                            <tr>
+
+                                <td>
+                                    Other Charges
+                                </td>
+
+                                <td class="text-end">
+
+                                    <span id="repair-other">
+                                        0.00
+                                    </span>
+
+                                </td>
+
+                            </tr>
+
+                            <tr class="fw-bold">
+
+                                <td>
+                                    Repair Total
+                                </td>
+
+                                <td class="text-end">
+
+                                    <span id="repair-total">
+                                        0.00
+                                    </span>
+
+                                </td>
+
+                            </tr>
+
+                        </table>
+
+                    </div>
+
+                </div>
+
+            </div>
+
+        </div>
+
+
+
+        <!-- ================================================= -->
+        <!-- INVOICE SUMMARY -->
+        <!-- ================================================= -->
+
+        <div
+            class="card shadow-sm mb-4"
+            id="summary-section"
+            style="display:none;"
+        >
+
+            <div class="card-header">
+
+                <h5 class="mb-0">
+                    Invoice Summary
+                </h5>
+
+            </div>
+
+
+            <div class="card-body">
+
+                <div class="row justify-content-end">
+
+                    <div class="col-md-5">
+
+                        <table class="table">
+
+                            <tr>
+
+                                <td>
+                                    Total Amount
+                                </td>
+
+                                <td class="text-end">
+
+                                    <strong id="summary-total">
+                                        0.00
+                                    </strong>
+
+                                </td>
+
+                            </tr>
+
+
+                            <tr>
+
+                                <td>
+                                    Tax
+                                </td>
+
+                                <td class="text-end">
+
+                                    <strong id="summary-tax">
+                                        0.00
+                                    </strong>
+
+                                </td>
+
+                            </tr>
+
+
+                            <tr>
+
+                                <td>
+                                    Discount
+                                </td>
+
+                                <td>
+
+                                    <input
+                                        type="number"
+                                        step="0.01"
+                                        min="0"
+                                        name="discount_amount"
+                                        id="discount-amount"
+                                        class="form-control text-end"
+                                        value="0"
+                                    >
+
+                                </td>
+
+                            </tr>
+
+
+                            <tr class="table-primary fw-bold">
+
+                                <td>
+                                    Net Amount
+                                </td>
+
+                                <td class="text-end">
+
+                                    <span
+                                        id="summary-grand-total"
+                                        class="fs-5"
+                                    >
+                                        0.00
+                                    </span>
+
+                                </td>
+
+                            </tr>
+
+                        </table>
+
+                    </div>
+
+                </div>
+
+
+                <!-- Notes -->
+
+                <div class="row">
+
+                    <div class="col-md-8">
+
+                        <label class="form-label">
+                            Invoice Remarks
+                        </label>
+
+                        <textarea
+                            name="notes"
+                            class="form-control"
+                            rows="3"
+                            placeholder="Optional remarks..."
+                        ></textarea>
+
+                    </div>
+
+                </div>
+
+            </div>
+
+        </div>
+
+
+
+        <!-- ================================================= -->
+        <!-- SUBMIT -->
+        <!-- ================================================= -->
+
+        <div
+            class="d-flex justify-content-end gap-2 mb-5"
+            id="submit-section"
+            style="display:none !important;"
+        >
+
+            <a
+                href="{% url 'sales_invoices' %}"
+                class="btn btn-outline-secondary"
+            >
+                Cancel
+            </a>
+
+            <button
+                type="submit"
+                class="btn btn-success"
+                id="generate-invoice"
+            >
+                <i class="fas fa-file-invoice"></i>
+                Generate Invoice
+            </button>
+
+        </div>
+
+    </form>
+
+</div>
+
+
+<!-- ========================================================= -->
+<!-- PRODUCT DATA -->
+<!-- ========================================================= -->
+
+{{ products_json|json_script:"products-data" }}
+
+
+<!-- ========================================================= -->
+<!-- CUSTOMER DATA -->
+<!-- ========================================================= -->
+
+<script id="customers-data" type="application/json">
+
+[
+{% for customer in customers %}
+{
+    "id": {{ customer.id }},
+    "name": "{{ customer.name|escapejs }}",
+    "mobile": "{{ customer.mobile|escapejs }}"
+}{% if not forloop.last %},{% endif %}
+{% endfor %}
+]
+
+</script>
+
+{% endblock %}
+
+
+{% block extra_js %}
+
+<script src="{% static 'js/sales_invoice.js' %}"></script>
+
+{% endblock %}

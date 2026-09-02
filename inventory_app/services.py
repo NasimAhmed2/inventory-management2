@@ -1,4 +1,4 @@
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation
 from django.utils import timezone
 from django.db import transaction
 from django.db.models import F
@@ -12,8 +12,11 @@ from .models import (
     InventoryMovement, 
     InventoryStock, 
     Customer, 
-    Ticket
+    Ticket,
+    SalesLineItem,
+    SalesInvoice,
 )
+
 
 
 
@@ -870,28 +873,7 @@ class CustomerService:
 
 class ServiceReportService:
 
-    # ==========================================================
-    # Report Number Generator
-    # ==========================================================
-
-    # @staticmethod
-    # def generate_report_number():
-
-    #     prefix = date.today().strftime("SR%y%m")
-
-    #     last = (
-    #         ServiceReport.objects
-    #         .filter(report_number__startswith=prefix)
-    #         .order_by("-report_number")
-    #         .first()
-    #     )
-
-    #     if last:
-    #         number = int(last.report_number[-4:]) + 1
-    #     else:
-    #         number = 1
-
-    #     return f"{prefix}{number:04d}"
+    
 
     @staticmethod
     def generate_report_number():
@@ -920,24 +902,15 @@ class ServiceReportService:
 
         return f"SR-{today}-{seq:04d}"
 
+
     @staticmethod
     def save_items(report, request):
 
-        product_ids = request.POST.getlist(
-            "product_id[]"
-        )
-
-        quantities = request.POST.getlist(
-            "quantity[]"
-        )
-
-        rates = request.POST.getlist(
-            "rate[]"
-        )
-
-        remarks = request.POST.getlist(
-            "item_remarks[]"
-        )
+        product_ids = request.POST.getlist("product_id[]")
+        quantities = request.POST.getlist("quantity[]")
+        rates = request.POST.getlist("rate[]")
+        tax_percentages = request.POST.getlist("tax_percent[]")
+        remarks = request.POST.getlist("item_remarks[]")
 
         for i, product_id in enumerate(product_ids):
 
@@ -956,6 +929,12 @@ class ServiceReportService:
                 rates[i]
             )
 
+            tax_percentage = Decimal(
+                tax_percentages[i]
+                if i < len(tax_percentages) and tax_percentages[i]
+                else "13"
+            )
+
             ServiceReportItem.objects.create(
 
                 service_report=report,
@@ -972,7 +951,7 @@ class ServiceReportService:
 
                 estimated_rate=rate,
 
-                line_total=quantity * rate,
+                tax_percentage=tax_percentage,
 
                 remarks=(
                     remarks[i]
@@ -1140,8 +1119,13 @@ class ServiceReportService:
 
     @staticmethod
     @transaction.atomic
-    def update_report(request, report):
-
+    def update_report(request, report_id):
+        print(report_id)
+        print("----- ALL POST DATA -----") 
+        print(request.POST)
+        report = ServiceReport.objects.get(
+            pk=report_id
+        )
         report.inspection_notes = request.POST.get(
             "inspection_notes",
             "",
@@ -1315,3 +1299,649 @@ class ServiceReportService:
         )
 
         return report
+
+
+    from decimal import Decimal, InvalidOperation
+
+
+
+
+
+
+
+class SaleService:
+
+    # ==========================================================
+    # Invoice Number
+    # ==========================================================
+
+    @staticmethod
+    def generate_invoice_number():
+
+        today = timezone.localdate()
+
+        prefix = f"SI-{today.strftime('%Y%m%d')}"
+
+        last_invoice = (
+            SalesInvoice.objects
+            .filter(invoice_number__startswith=prefix)
+            .order_by("-id")
+            .first()
+        )
+
+        if last_invoice:
+            try:
+                last_number = int(
+                    last_invoice.invoice_number.split("-")[-1]
+                )
+            except (ValueError, IndexError):
+                last_number = 0
+        else:
+            last_number = 0
+
+        return f"{prefix}-{last_number + 1:04d}"
+
+    # ==========================================================
+    # Decimal Helper
+    # ==========================================================
+
+    @staticmethod
+    def decimal_value(value, default=Decimal("0.00")):
+
+        try:
+            if value in (None, ""):
+                return default
+
+            return Decimal(str(value))
+
+        except (InvalidOperation, TypeError, ValueError):
+            return default
+
+    # ==========================================================
+    # DIRECT SALE
+    # ==========================================================
+
+    @staticmethod
+    @transaction.atomic
+    def create_direct_sale(
+        *,
+        customer,
+        request,
+        user,
+    ):
+
+        invoice_date = request.POST.get(
+            "invoice_date"
+        ) or timezone.localdate()
+
+        discount = SaleService.decimal_value(
+            request.POST.get("discount_amount")
+        )
+
+        notes = request.POST.get(
+            "notes",
+            ""
+        ).strip()
+
+        discount_remark = request.POST.get(
+            "discount_remark",
+            ""
+        ).strip()
+
+        payment_mode = request.POST.get(
+            "payment_mode",
+            "cash",
+        ).strip().lower()
+
+        invoice_number = SaleService.generate_invoice_number()
+
+        invoice = SalesInvoice.objects.create(
+            invoice_number=invoice_number,
+            customer=customer,
+            invoice_date=invoice_date,
+            sale_type="DIRECT",
+            status="confirmed",
+            payment_mode=payment_mode,
+            notes=SaleService.build_notes(
+                notes,
+                discount_remark,
+            ),
+        )
+
+        SaleService._create_direct_items(
+            invoice=invoice,
+            request=request,
+            user=user,
+        )
+
+        SaleService._finalize_invoice(
+            invoice=invoice,
+            discount=discount,
+        )
+
+        return invoice
+
+    # ==========================================================
+    # DIRECT SALE ITEMS
+    # ==========================================================
+
+    @staticmethod
+    def _create_direct_items(
+        *,
+        invoice,
+        request,
+        user,
+    ):
+
+        product_ids = request.POST.getlist(
+            "product_id[]"
+        )
+
+        quantities = request.POST.getlist(
+            "quantity[]"
+        )
+
+        rates = request.POST.getlist(
+            "rate[]"
+        )
+
+        tax_percentages = request.POST.getlist(
+            "tax_percentage[]"
+        )
+
+        serial_numbers = request.POST.getlist(
+            "serial_number[]"
+        )
+
+        for index, product_id in enumerate(product_ids):
+
+            if not product_id:
+                continue
+
+            product = Product.objects.get(
+                pk=product_id
+            )
+
+            quantity = int(
+                quantities[index]
+                if index < len(quantities)
+                else 1
+            )
+
+            rate = SaleService.decimal_value(
+                rates[index]
+                if index < len(rates)
+                else product.selling_price
+            )
+
+            tax_percentage = SaleService.decimal_value(
+                tax_percentages[index]
+                if index < len(tax_percentages)
+                else 13
+            )
+
+            serial_number = (
+                serial_numbers[index]
+                if index < len(serial_numbers)
+                else ""
+            )
+
+            subtotal = (
+                Decimal(quantity) * rate
+            )
+
+            tax_amount = (
+                subtotal * tax_percentage / Decimal("100")
+            )
+
+            line_total = (
+                subtotal + tax_amount
+            )
+
+            SalesLineItem.objects.create(
+
+                invoice=invoice,
+
+                item_code=product.item_code,
+
+                item_name=product.item_name,
+
+                specification=product.specification,
+
+                quantity=quantity,
+
+                rate=rate,
+
+                tax_percentage=tax_percentage,
+
+                tax_amount=tax_amount,
+
+                discount_percentage=Decimal("0.00"),
+
+                discount_amount=Decimal("0.00"),
+
+                line_total=line_total,
+
+                serial_number=serial_number,
+
+            )
+
+            # ----------------------------------------------
+            # DIRECT SALE MOVES STOCK OUT
+            # ----------------------------------------------
+
+            InventoryService.sale(
+
+                product=product,
+
+                quantity=quantity,
+
+                document_number=invoice,
+
+                user=user,
+
+                remarks=(
+                    f"Direct sale "
+                    f"{invoice.invoice_number}"
+                ),
+
+            )
+
+    # ==========================================================
+    # REPAIR SALE
+    # ==========================================================
+
+    @staticmethod
+    @transaction.atomic
+    def create_repair_sale(
+        *,
+        service_report,
+        request,
+        user,
+    ):
+
+        if service_report.status != ServiceReport.APPROVED:
+
+            raise ValueError(
+                "Only an approved service report "
+                "can be invoiced."
+            )
+
+        if SalesInvoice.objects.filter(
+            service_report=service_report
+        ).exists():
+
+            raise ValueError(
+                "This service report has already "
+                "been invoiced."
+            )
+
+        invoice_date = request.POST.get(
+            "invoice_date"
+        ) or timezone.localdate()
+
+        discount = SaleService.decimal_value(
+            request.POST.get("discount_amount")
+        )
+
+        notes = request.POST.get(
+            "notes",
+            ""
+        ).strip()
+
+        discount_remark = request.POST.get(
+            "discount_remark",
+            ""
+        ).strip()
+
+        invoice = SalesInvoice.objects.create(
+
+            invoice_number=SaleService.generate_invoice_number(),
+
+            customer=service_report.ticket.customer,
+
+            invoice_date=invoice_date,
+
+            sale_type="REPAIR",
+
+            service_report=service_report,
+
+            status="confirmed",
+
+            notes=SaleService.build_notes(
+                notes,
+                discount_remark,
+            ),
+
+        )
+
+        # --------------------------------------------------
+        # Copy Service Report Items
+        # --------------------------------------------------
+
+        for item in service_report.items.select_related(
+            "product"
+        ):
+
+            product = item.product
+
+            quantity = item.quantity
+
+            rate = item.estimated_rate
+
+            # Service report estimate is already the
+            # repair selling rate.
+
+            line_total = (
+                Decimal(quantity) * rate
+            )
+
+            SalesLineItem.objects.create(
+
+                invoice=invoice,
+
+                item_code=product.item_code,
+
+                item_name=product.item_name,
+
+                specification=product.specification,
+
+                quantity=quantity,
+
+                rate=rate,
+
+                tax_percentage=Decimal("0.00"),
+
+                tax_amount=Decimal("0.00"),
+
+                discount_percentage=Decimal("0.00"),
+
+                discount_amount=Decimal("0.00"),
+
+                line_total=line_total,
+
+            )
+
+        # --------------------------------------------------
+        # Labour / Other Charges
+        #
+        # These are not Product lines.
+        # We include them in invoice total.
+        # --------------------------------------------------
+
+        parts_total = sum(
+            (
+                item.line_total
+                for item in invoice.items.all()
+            ),
+            Decimal("0.00"),
+        )
+
+        labour = service_report.labor_charge
+
+        other = service_report.other_charge
+
+        subtotal = (
+            parts_total
+            + labour
+            + other
+        )
+
+        invoice.total_amount = subtotal
+
+        invoice.tax_amount = Decimal("0.00")
+
+        invoice.discount_amount = discount
+
+        invoice.grand_total = max(
+            subtotal - discount,
+            Decimal("0.00"),
+        )
+
+        invoice.save(
+            update_fields=[
+                "total_amount",
+                "tax_amount",
+                "discount_amount",
+                "grand_total",
+            ]
+        )
+
+        # IMPORTANT:
+        #
+        # We DO NOT call InventoryService.sale()
+        # here.
+        #
+        # The service report approval already moved
+        # the required parts out of warehouse stock.
+
+        return invoice
+
+    # ==========================================================
+    # SALE RETURN
+    # ==========================================================
+
+    @staticmethod
+    @transaction.atomic
+    def create_sale_return(
+        *,
+        customer,
+        request,
+        user,
+    ):
+
+        invoice_date = request.POST.get(
+            "invoice_date"
+        ) or timezone.localdate()
+
+        discount = SaleService.decimal_value(
+            request.POST.get("discount_amount")
+        )
+
+        notes = request.POST.get(
+            "notes",
+            ""
+        ).strip()
+
+        discount_remark = request.POST.get(
+            "discount_remark",
+            ""
+        ).strip()
+
+        invoice = SalesInvoice.objects.create(
+
+            invoice_number=SaleService.generate_invoice_number(),
+
+            customer=customer,
+
+            invoice_date=invoice_date,
+
+            sale_type="RETURN",
+
+            status="confirmed",
+
+            notes=SaleService.build_notes(
+                notes,
+                discount_remark,
+            ),
+
+        )
+
+        product_ids = request.POST.getlist(
+            "product_id[]"
+        )
+
+        quantities = request.POST.getlist(
+            "quantity[]"
+        )
+
+        rates = request.POST.getlist(
+            "rate[]"
+        )
+
+        tax_percentages = request.POST.getlist(
+            "tax_percentage[]"
+        )
+
+        for index, product_id in enumerate(product_ids):
+
+            if not product_id:
+                continue
+
+            product = Product.objects.get(
+                pk=product_id
+            )
+
+            quantity = int(
+                quantities[index]
+            )
+
+            rate = SaleService.decimal_value(
+                rates[index]
+                if index < len(rates)
+                else product.selling_price
+            )
+
+            tax_percentage = SaleService.decimal_value(
+                tax_percentages[index]
+                if index < len(tax_percentages)
+                else 13
+            )
+
+            subtotal = (
+                Decimal(quantity) * rate
+            )
+
+            tax_amount = (
+                subtotal
+                * tax_percentage
+                / Decimal("100")
+            )
+
+            line_total = (
+                subtotal + tax_amount
+            )
+
+            SalesLineItem.objects.create(
+
+                invoice=invoice,
+
+                item_code=product.item_code,
+
+                item_name=product.item_name,
+
+                specification=product.specification,
+
+                quantity=quantity,
+
+                rate=rate,
+
+                tax_percentage=tax_percentage,
+
+                tax_amount=tax_amount,
+
+                line_total=line_total,
+
+            )
+
+            # ----------------------------------------------
+            # RETURN MOVES STOCK BACK INTO WAREHOUSE
+            # ----------------------------------------------
+
+            InventoryService.sale_return(
+
+                product=product,
+
+                quantity=quantity,
+
+                unit_cost=product.selling_price,
+
+                document_number=invoice,
+
+                user=user,
+
+                remarks=(
+                    f"Sale return "
+                    f"{invoice.invoice_number}"
+                ),
+
+            )
+
+        SaleService._finalize_invoice(
+            invoice=invoice,
+            discount=discount,
+        )
+
+        return invoice
+
+    # ==========================================================
+    # Finalize Invoice
+    # ==========================================================
+    @staticmethod
+    def _finalize_invoice(
+        *,
+        invoice,
+        discount=Decimal("0.00"),
+    ):
+
+        subtotal = sum(
+            (
+                item.quantity * item.rate
+                for item in invoice.items.all()
+            ),
+            Decimal("0.00"),
+        )
+
+        tax_amount = sum(
+            (
+                item.tax_amount
+                for item in invoice.items.all()
+            ),
+            Decimal("0.00"),
+        )
+
+        total_before_discount = (
+            subtotal + tax_amount
+        )
+
+        grand_total = max(
+            total_before_discount - discount,
+            Decimal("0.00"),
+        )
+
+        invoice.total_amount = subtotal
+        invoice.tax_amount = tax_amount
+        invoice.discount_amount = discount
+        invoice.grand_total = grand_total
+
+        invoice.save(
+            update_fields=[
+                "total_amount",
+                "tax_amount",
+                "discount_amount",
+                "grand_total",
+            ]
+        )
+
+    # ==========================================================
+    # Notes
+    # ==========================================================
+
+    @staticmethod
+    def build_notes(
+        notes,
+        discount_remark,
+    ):
+
+        parts = []
+
+        if notes:
+            parts.append(notes)
+
+        if discount_remark:
+
+            parts.append(
+                f"Discount Remark: {discount_remark}"
+            )
+
+        return "\n".join(parts)
