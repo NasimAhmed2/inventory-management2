@@ -379,53 +379,64 @@ document.addEventListener("DOMContentLoaded", function () {
 
         const row = document.createElement("tr");
 
-        row.classList.add(
-            "sale-item-row"
-        );
-
+        row.classList.add("sale-item-row");
 
         row.innerHTML = `
 
-            <!-- Category -->
-
+            <!-- Product Search -->
             <td>
+                <div class="position-relative">
 
-                <select
-                    name="item_category[]"
-                    class="form-select form-select-sm item-category"
-                    required
+                    <input
+                        type="text"
+                        class="form-control form-control-sm product-search"
+                        placeholder="Search code or product name..."
+                        autocomplete="off"
+                        required
+                    >
+
+                    <div
+                        class="product-suggestions list-group position-absolute w-100 shadow-sm"
+                        style="
+                            display:none;
+                            z-index:1050;
+                            max-height:240px;
+                            overflow-y:auto;
+                        "
+                    ></div>
+
+                </div>
+
+                <!-- Hidden product ID -->
+                <input
+                    type="hidden"
+                    name="product_id[]"
+                    class="item-product-id"
                 >
 
-                    <option value="">
-                        Select Category
-                    </option>
-
-                </select>
-
+                <!-- Hidden category -->
+                <input
+                    type="hidden"
+                    name="item_category[]"
+                    class="item-category"
+                >
             </td>
 
 
             <!-- Item Code -->
-
             <td>
 
-                <select
+                <input
+                    type="text"
                     name="item_code[]"
-                    class="form-select form-select-sm item-code"
-                    required
+                    class="form-control form-control-sm item-code"
+                    readonly
                 >
-
-                    <option value="">
-                        Select Item
-                    </option>
-
-                </select>
 
             </td>
 
 
             <!-- Item Name -->
-
             <td>
 
                 <input
@@ -435,17 +446,10 @@ document.addEventListener("DOMContentLoaded", function () {
                     readonly
                 >
 
-                <input
-                    type="hidden"
-                    name="product_id[]"
-                    class="item-product-id"
-                >
-
             </td>
 
 
             <!-- Quantity -->
-
             <td>
 
                 <input
@@ -462,7 +466,6 @@ document.addEventListener("DOMContentLoaded", function () {
 
 
             <!-- Rate -->
-
             <td>
 
                 <input
@@ -478,8 +481,7 @@ document.addEventListener("DOMContentLoaded", function () {
             </td>
 
 
-            <!-- Tax -->
-
+            <!-- Tax % -->
             <td>
 
                 <input
@@ -495,7 +497,6 @@ document.addEventListener("DOMContentLoaded", function () {
 
 
             <!-- Tax Amount -->
-
             <td>
 
                 <input
@@ -510,7 +511,6 @@ document.addEventListener("DOMContentLoaded", function () {
 
 
             <!-- Line Amount -->
-
             <td>
 
                 <input
@@ -525,7 +525,6 @@ document.addEventListener("DOMContentLoaded", function () {
 
 
             <!-- Remove -->
-
             <td class="text-center">
 
                 <button
@@ -533,9 +532,7 @@ document.addEventListener("DOMContentLoaded", function () {
                     class="btn btn-sm btn-outline-danger remove-item"
                     title="Remove Item"
                 >
-
                     <i class="fas fa-trash"></i>
-
                 </button>
 
             </td>
@@ -546,309 +543,339 @@ document.addEventListener("DOMContentLoaded", function () {
         itemsBody.appendChild(row);
 
 
-        populateCategories(
-            row.querySelector(
-                ".item-category"
-            )
-        );
-
-
         attachRowEvents(row);
 
 
         calculateInvoice();
+
     }
 
 
     // ==========================================================
-    // Populate Categories
-    // ==========================================================
+        // Row Events
+        // ==========================================================
 
-    function populateCategories(select) {
+        function attachRowEvents(row) {
+            console.log("ATTACH ROW EVENTS FIRED");
 
-        const categories =
-            [...new Set(
-                products
-                    .map(product => product.category)
-                    .filter(category => category)
-            )]
-            .sort();
+            const searchInput =
+                row.querySelector(".product-search");
+
+            const suggestions =
+                row.querySelector(".product-suggestions");
+
+            const quantityInput =
+                row.querySelector(".item-quantity");
+
+            const rateInput =
+                row.querySelector(".item-rate");
+
+            const taxInput =
+                row.querySelector(".item-tax-percentage");
+
+            const removeButton =
+                row.querySelector(".remove-item");
 
 
-        categories.forEach(
-            category => {
+        // ======================================================
+        // Product Search
+        // ======================================================
 
-                const option =
-                    document.createElement(
-                        "option"
-                    );
+        searchInput.addEventListener("input", function () {
+            console.log("SEARCH FIRED:", this.value);
+            const searchText =
+                this.value.trim().toLowerCase();
 
-                option.value =
-                    category;
+            clearProductFields(row);
 
-                option.textContent =
-                    category;
+            if (!searchText) {
 
-                select.appendChild(
-                    option
-                );
+                suggestions.innerHTML = "";
+                suggestions.style.display = "none";
+
+                return;
             }
-        );
-    }
 
 
-    // ==========================================================
-    // Row Events
-    // ==========================================================
+            // --------------------------------------------------
+            // Find matching products
+            // --------------------------------------------------
 
-    function attachRowEvents(row) {
+            const matches = products
+                .map(product => {
 
-        const categorySelect =
-            row.querySelector(
-                ".item-category"
-            );
+                    const code =
+                        String(product.item_code || "").toLowerCase();
 
-        const codeSelect =
-            row.querySelector(
-                ".item-code"
-            );
+                    const name =
+                        String(product.item_name || "").toLowerCase();
 
-        const quantityInput =
-            row.querySelector(
-                ".item-quantity"
-            );
+                    let score = 0;
 
-        const rateInput =
-            row.querySelector(
-                ".item-rate"
-            );
+                    // Exact code/name
+                    if (code === searchText) {
+                        score = 100;
+                    }
 
-        const taxInput =
-            row.querySelector(
-                ".item-tax-percentage"
-            );
+                    else if (name === searchText) {
+                        score = 95;
+                    }
 
-        const removeButton =
-            row.querySelector(
-                ".remove-item"
-            );
+                    // Code starts with search
+                    else if (code.startsWith(searchText)) {
+                        score = 90;
+                    }
+
+                    // Name starts with search
+                    else if (name.startsWith(searchText)) {
+                        score = 85;
+                    }
+
+                    // Code contains search
+                    else if (code.includes(searchText)) {
+                        score = 70;
+                    }
+
+                    // Name contains search
+                    else if (name.includes(searchText)) {
+                        score = 60;
+                    }
+
+                    return {
+                        product: product,
+                        score: score
+                    };
+
+                })
+
+                .filter(result => result.score > 0)
+
+                .sort((a, b) => {
+
+                    if (b.score !== a.score) {
+                        return b.score - a.score;
+                    }
+
+                    return String(a.product.item_code)
+                        .localeCompare(
+                            String(b.product.item_code)
+                        );
+
+                })
+
+                .slice(0, 5);
+
+                console.log("SEARCH TEXT:", searchText);
+                console.log("MATCHES:", matches);
 
 
-        // ------------------------------------------------------
-        // Category Changed
-        // ------------------------------------------------------
+            // --------------------------------------------------
+            // No results
+            // --------------------------------------------------
 
-        categorySelect.addEventListener(
-            "change",
-            function () {
+            if (matches.length === 0) {
+                console.log("SUGGESTIONS matches:", matches);
+                suggestions.innerHTML = `
+                    <div class="list-group-item text-muted small">
+                        No matching product found
+                    </div>
+                `;
+                console.log("SUGGESTIONS ELEMENT:", suggestions);
+                suggestions.style.display = "block";
 
-                const category =
-                    this.value;
+                return;
+            }
 
-                codeSelect.innerHTML = `
-                    <option value="">
-                        Select Item
-                    </option>
+
+            // --------------------------------------------------
+            // Display top 5 suggestions
+            // --------------------------------------------------
+
+            suggestions.innerHTML = "";
+
+
+            matches.forEach(result => {
+
+                const product = result.product;
+
+
+                const item =
+                    document.createElement("button");
+
+                item.type = "button";
+
+                item.className =
+                    "list-group-item list-group-item-action";
+
+
+                item.innerHTML = `
+
+                    <div class="fw-semibold">
+                        ${escapeHtml(product.item_code)}
+                    </div>
+
+                    <div class="small text-muted">
+                        ${escapeHtml(product.item_name)}
+                    </div>
+
                 `;
 
 
-                if (!category) {
-                    clearProductRow(row);
-                    return;
-                }
+                item.addEventListener("click", function () {
+
+                    selectProduct(row, product);
+
+                    suggestions.innerHTML = "";
+
+                    suggestions.style.display = "none";
+
+                });
 
 
-                const categoryProducts =
-                    products.filter(
-                        product =>
-                            product.category ===
-                            category
-                    );
+                suggestions.appendChild(item);
+
+            });
+            console.log("SUGGESTIONS ELEMENT:", suggestions);
+
+            suggestions.style.display = "block";
+
+        });
 
 
-                categoryProducts.forEach(
-                    product => {
-
-                        const option =
-                            document.createElement(
-                                "option"
-                            );
-
-                        option.value =
-                            product.item_code;
-
-                        option.textContent =
-                            product.item_code;
-
-                        option.dataset.productId =
-                            product.id;
-
-                        codeSelect.appendChild(
-                            option
-                        );
-
-                    }
-                );
-
-
-                clearProductFields(row);
-
-            }
-        );
-
-
-        // ------------------------------------------------------
-        // Item Changed
-        // ------------------------------------------------------
-
-        codeSelect.addEventListener(
-            "change",
-            function () {
-
-                const code =
-                    this.value;
-
-                const product =
-                    products.find(
-                        product =>
-                            product.item_code ===
-                            code
-                    );
-
-
-                if (!product) {
-
-                    clearProductFields(row);
-
-                    return;
-                }
-
-
-                row.querySelector(
-                    ".item-product-id"
-                ).value =
-                    product.id;
-
-
-                row.querySelector(
-                    ".item-name"
-                ).value =
-                    product.item_name;
-
-
-                row.querySelector(
-                    ".item-rate"
-                ).value =
-                    money(
-                        product.selling_price
-                    );
-
-
-                calculateRow(row);
-
-            }
-        );
-
-
-        // ------------------------------------------------------
+        // ======================================================
         // Quantity
-        // ------------------------------------------------------
+        // ======================================================
 
-        quantityInput.addEventListener(
-            "input",
-            function () {
+        quantityInput.addEventListener("input", function () {
 
-                calculateRow(row);
+            calculateRow(row);
 
-            }
-        );
+        });
 
 
-        // ------------------------------------------------------
+        // ======================================================
         // Rate
-        // ------------------------------------------------------
+        // ======================================================
 
-        rateInput.addEventListener(
-            "input",
-            function () {
+        rateInput.addEventListener("input", function () {
 
-                calculateRow(row);
+            calculateRow(row);
 
-            }
-        );
+        });
 
 
-        // ------------------------------------------------------
+        // ======================================================
         // Tax %
-        // ------------------------------------------------------
+        // ======================================================
 
-        taxInput.addEventListener(
-            "input",
-            function () {
+        taxInput.addEventListener("input", function () {
 
-                calculateRow(row);
+            calculateRow(row);
 
-            }
-        );
+        });
 
 
-        // ------------------------------------------------------
+        // ======================================================
         // Remove
-        // ------------------------------------------------------
+        // ======================================================
 
-        removeButton.addEventListener(
-            "click",
-            function () {
+        removeButton.addEventListener("click", function () {
 
-                row.remove();
+            row.remove();
 
-                calculateInvoice();
+            calculateInvoice();
+
+        });
+
+
+        // ======================================================
+        // Hide suggestions when clicking elsewhere
+        // ======================================================
+
+        document.addEventListener("click", function (event) {
+
+            if (!row.contains(event.target)) {
+
+                suggestions.style.display = "none";
 
             }
-        );
+
+        });
+
+    }
+
+    // ==========================================================
+    // Select Product
+    // ==========================================================
+
+    function selectProduct(row, product) {
+
+        // Product ID
+        row.querySelector(".item-product-id").value =
+            product.id;
+
+
+        // Category
+        row.querySelector(".item-category").value =
+            product.category || "";
+
+
+        // Item Code
+        row.querySelector(".item-code").value =
+            product.item_code;
+
+
+        // Item Name
+        row.querySelector(".item-name").value =
+            product.item_name;
+
+
+        // Selling Price
+        row.querySelector(".item-rate").value =
+            money(product.selling_price);
+
+
+        // Search box
+        row.querySelector(".product-search").value =
+            `${product.item_code} (${product.item_name})`;
+
+
+        // Recalculate
+        calculateRow(row);
 
     }
 
 
     // ==========================================================
-    // Clear Product Row
+    // Clear Product Fields
     // ==========================================================
-
-    function clearProductRow(row) {
-
-        row.querySelector(
-            ".item-code"
-        ).innerHTML = `
-            <option value="">
-                Select Item
-            </option>
-        `;
-
-        clearProductFields(row);
-    }
-
 
     function clearProductFields(row) {
 
-        row.querySelector(
-            ".item-product-id"
-        ).value = "";
+        row.querySelector(".item-product-id").value = "";
 
-        row.querySelector(
-            ".item-name"
-        ).value = "";
+        row.querySelector(".item-category").value = "";
 
-        row.querySelector(
-            ".item-rate"
-        ).value = "0";
+        row.querySelector(".item-code").value = "";
 
-        row.querySelector(
-            ".item-tax-amount"
-        ).value = "0.00";
+        row.querySelector(".item-name").value = "";
 
-        row.querySelector(
-            ".item-line-total"
-        ).value = "0.00";
+        row.querySelector(".item-rate").value = "0";
+
+    }
+
+    // ==========================================================
+    // Escape HTML
+    // ==========================================================
+
+    function escapeHtml(value) {
+
+        return String(value ?? "")
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;")
+            .replace(/"/g, "&quot;")
+            .replace(/'/g, "&#039;");
 
     }
 

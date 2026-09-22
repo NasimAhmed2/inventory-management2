@@ -4,6 +4,12 @@ from django.db import transaction
 from django.db.models import F
 from datetime import date
 from django.db.models import Q
+from django.conf import settings
+from django.core.mail import EmailMessage
+from io import BytesIO
+from openpyxl import Workbook
+from openpyxl.styles import Font, Alignment
+
 from .models import (
     Product,
     ServiceReport,
@@ -15,7 +21,10 @@ from .models import (
     Ticket,
     SalesLineItem,
     SalesInvoice,
+    VendorLedger,
 )
+
+
 
 
 
@@ -1945,3 +1954,387 @@ class SaleService:
             )
 
         return "\n".join(parts)
+
+
+
+class VendorLedgerService:
+
+    @staticmethod
+    def recalculate(vendor):
+
+        entries = VendorLedger.objects.filter(
+            vendor=vendor
+        ).order_by(
+            "transaction_date",
+            "id"
+        )
+
+        balance = Decimal("0.00")
+
+        for entry in entries:
+
+            balance += entry.cr
+            balance -= entry.dr
+
+            entry.closing_balance = balance
+
+        VendorLedger.objects.bulk_update(
+            entries,
+            ["closing_balance"]
+        )
+
+        return balance
+
+
+    @staticmethod
+    def generate_excel(
+        vendor,
+        from_date,
+        to_date,
+    ):
+
+        previous_transaction = VendorLedger.objects.filter(
+            vendor=vendor,
+            transaction_date__lt=from_date,
+        ).order_by(
+            "-transaction_date",
+            "-id",
+        ).first()
+
+        opening_balance = (
+            previous_transaction.closing_balance
+            if previous_transaction
+            else Decimal("0.00")
+        )
+
+
+        transactions = VendorLedger.objects.filter(
+            vendor=vendor,
+            transaction_date__gte=from_date,
+            transaction_date__lte=to_date,
+        ).select_related(
+            "against_invoice"
+        ).order_by(
+            "transaction_date",
+            "id",
+        )
+
+
+        workbook = Workbook()
+
+        worksheet = workbook.active
+
+        worksheet.title = "Vendor Ledger"
+
+
+        # ==========================================
+        # Header
+        # ==========================================
+
+        worksheet["A1"] = "Vendor Ledger"
+
+        worksheet["A1"].font = Font(
+            bold=True,
+            size=16
+        )
+
+
+        worksheet["A3"] = "Vendor"
+        worksheet["B3"] = vendor.name
+
+        worksheet["A4"] = "Vendor Code"
+        worksheet["B4"] = vendor.vendor_code
+
+        worksheet["A5"] = "Period"
+
+        worksheet["B5"] = (
+            f"{from_date.strftime('%d-%m-%Y')} "
+            f"to "
+            f"{to_date.strftime('%d-%m-%Y')}"
+        )
+
+
+        worksheet["A6"] = "Opening Balance"
+        worksheet["B6"] = opening_balance
+
+
+        # ==========================================
+        # Table
+        # ==========================================
+
+        header_row = 8
+
+        headers = [
+            "Date",
+            "Transaction",
+            "Invoice / Reference",
+            "Mode",
+            "Remark",
+            "Debit",
+            "Credit",
+            "Balance",
+        ]
+
+        for column, header in enumerate(
+            headers,
+            start=1
+        ):
+
+            cell = worksheet.cell(
+                row=header_row,
+                column=column,
+                value=header
+            )
+
+            cell.font = Font(
+                bold=True
+            )
+
+            cell.alignment = Alignment(
+                horizontal="center"
+            )
+
+
+        row = header_row + 1
+
+        running_balance = opening_balance
+
+
+        # ==========================================
+        # Opening Balance Row
+        # ==========================================
+
+        worksheet.cell(
+            row=row,
+            column=2,
+            value="Opening Balance"
+        ).font = Font(
+            bold=True
+        )
+
+        if opening_balance < 0:
+
+            worksheet.cell(
+                row=row,
+                column=6,
+                value=abs(opening_balance)
+            )
+
+        elif opening_balance > 0:
+
+            worksheet.cell(
+                row=row,
+                column=7,
+                value=opening_balance
+            )
+
+        worksheet.cell(
+            row=row,
+            column=8,
+            value=opening_balance
+        )
+
+        row += 1
+
+
+        # ==========================================
+        # Transactions
+        # ==========================================
+
+        for entry in transactions:
+
+            running_balance += entry.cr
+            running_balance -= entry.dr
+
+
+            invoice_reference = ""
+
+            if entry.against_invoice:
+
+                invoice_reference = (
+                    entry.against_invoice.invoice_number
+                )
+
+            elif entry.reference:
+
+                invoice_reference = entry.reference
+
+
+            mode_display = ""
+
+            if entry.mode:
+
+                mode_display = (
+                    entry.get_mode_display()
+                )
+
+
+            worksheet.cell(
+                row=row,
+                column=1,
+                value=entry.transaction_date
+            )
+
+            worksheet.cell(
+                row=row,
+                column=2,
+                value=entry.get_transaction_type_display()
+            )
+
+            worksheet.cell(
+                row=row,
+                column=3,
+                value=invoice_reference
+            )
+
+            worksheet.cell(
+                row=row,
+                column=4,
+                value=mode_display
+            )
+
+            worksheet.cell(
+                row=row,
+                column=5,
+                value=entry.remark or ""
+            )
+
+            worksheet.cell(
+                row=row,
+                column=6,
+                value=entry.dr
+            )
+
+            worksheet.cell(
+                row=row,
+                column=7,
+                value=entry.cr
+            )
+
+            worksheet.cell(
+                row=row,
+                column=8,
+                value=running_balance
+            )
+
+            row += 1
+
+
+        # ==========================================
+        # Closing Balance
+        # ==========================================
+
+        closing_row = row + 1
+
+        worksheet.cell(
+            row=closing_row,
+            column=1,
+            value="Closing Balance"
+        ).font = Font(
+            bold=True
+        )
+
+        worksheet.cell(
+            row=closing_row,
+            column=8,
+            value=running_balance
+        ).font = Font(
+            bold=True
+        )
+
+
+        # ==========================================
+        # Formatting
+        # ==========================================
+
+        for cell in worksheet["A"]:
+            cell.alignment = Alignment(
+                vertical="center"
+            )
+
+
+        for row_cells in worksheet.iter_rows(
+            min_row=header_row,
+            max_row=closing_row
+        ):
+
+            for cell in row_cells:
+
+                if cell.column in [6, 7, 8]:
+
+                    cell.number_format = (
+                        '#,##0.00'
+                    )
+
+
+        worksheet.column_dimensions["A"].width = 15
+        worksheet.column_dimensions["B"].width = 22
+        worksheet.column_dimensions["C"].width = 25
+        worksheet.column_dimensions["D"].width = 18
+        worksheet.column_dimensions["E"].width = 35
+        worksheet.column_dimensions["F"].width = 15
+        worksheet.column_dimensions["G"].width = 15
+        worksheet.column_dimensions["H"].width = 18
+
+
+        # ==========================================
+        # Return Excel as bytes
+        # ==========================================
+
+        output = BytesIO()
+
+        workbook.save(output)
+
+        output.seek(0)
+
+        return output.getvalue()
+
+class VendorLedgerEmailService:
+
+    @staticmethod
+    def send_ledger(
+        vendor,
+        recipient_email,
+        from_date,
+        to_date,
+        excel_file,
+        filename,
+    ):
+
+        subject = (
+            f"Vendor Ledger - "
+            f"{vendor.name} - "
+            f"{from_date.strftime('%d-%m-%Y')} to "
+            f"{to_date.strftime('%d-%m-%Y')}"
+        )
+
+        message = f"""
+            Dear {vendor.name},
+
+            Please find attached your vendor ledger for the period:
+
+            {from_date.strftime('%d-%m-%Y')} to {to_date.strftime('%d-%m-%Y')}
+
+            The attached Excel file contains the opening balance,
+            transactions during the selected period, and closing balance.
+
+            Regards,
+            Inventory Management
+            """
+
+        email = EmailMessage(
+            subject=subject,
+            body=message,
+            from_email=settings.EMAIL_HOST_USER,
+            to=[recipient_email],
+        )
+
+        email.attach(
+            filename,
+            excel_file,
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        )
+
+        email.send(
+            fail_silently=False
+        )

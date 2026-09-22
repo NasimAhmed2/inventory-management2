@@ -1,0 +1,786 @@
+{% extends 'base.html' %}
+
+{% block title %}Vendor Ledger - {{ vendor.name }}{% endblock %}
+
+{% block content %}
+
+<div class="container-fluid">
+
+    <!-- Header -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+
+        <div>
+            <h1 class="h3 mb-1">
+                <i class="fas fa-book"></i>
+                Vendor Ledger
+            </h1>
+
+            <div class="text-muted">
+                {{ vendor.name }}
+            </div>
+        </div>
+
+        <div class="text-end">
+            <div class="text-muted small">
+                Closing Balance
+            </div>
+
+            <div class="fs-3 fw-bold">
+                ₹{{ closing_balance|floatformat:2 }}
+            </div>
+        </div>
+
+    </div>
+
+
+    <!-- Action Buttons -->
+    <div class="card mb-4">
+        <div class="card-body">
+
+            <a
+                href="#"
+                class="btn btn-outline-primary me-2"
+                data-bs-toggle="modal"
+                data-bs-target="#downloadLedgerModal"
+            >
+                <i class="fas fa-download"></i>
+                Download Ledger
+            </a>
+
+            <a
+                href="#"
+                class="btn btn-primary"
+                data-bs-toggle="modal"
+                data-bs-target="#addVendorTransactionModal"
+            >
+                <i class="fas fa-plus"></i>
+                Add Payment
+            </a>
+
+            <a
+                href="#"
+                class="btn btn-primary"
+                data-bs-toggle="modal"
+                data-bs-target="#emailVendorLedgerModal"
+            >
+                <i class="fas fa-envelope"></i>
+                Email to Vendor
+            </a>
+
+        </div>
+    </div>
+
+
+    <!-- Ledger -->
+    <div class="card">
+
+        <div class="card-header">
+            <h5 class="mb-0">
+                <i class="fas fa-list"></i>
+                Recent Transactions
+            </h5>
+        </div>
+
+        <div class="card-body p-0">
+
+            <div class="table-responsive">
+
+                <table class="table table-hover mb-0">
+
+                    <thead>
+                        <tr>
+                            <th>Date</th>
+                            <th>Transaction</th>
+                            <th>Invoice</th>
+                            <th>Remark</th>
+                            <th class="text-end">Debit</th>
+                            <th class="text-end">Credit</th>
+                            <th class="text-end">Balance</th>
+                        </tr>
+                    </thead>
+
+                    <tbody>
+
+                        {% for entry in transactions %}
+
+                        <tr>
+
+                            <td>
+                                {{ entry.transaction_date|date:"d-m-Y" }}
+                            </td>
+
+                            <td>
+                                {{ entry.get_transaction_type_display }}
+                            </td>
+
+                            <td>
+                                {% if entry.against_invoice %}
+                                    {{ entry.against_invoice.invoice_number }}
+                                {% else %}
+                                    -
+                                {% endif %}
+                            </td>
+
+                            <td>
+                                {{ entry.remark|default:"-" }}
+                            </td>
+
+                            <td class="text-end">
+                                {% if entry.dr %}
+                                    ₹{{ entry.dr|floatformat:2 }}
+                                {% else %}
+                                    -
+                                {% endif %}
+                            </td>
+
+                            <td class="text-end">
+                                {% if entry.cr %}
+                                    ₹{{ entry.cr|floatformat:2 }}
+                                {% else %}
+                                    -
+                                {% endif %}
+                            </td>
+
+                            <td class="text-end fw-semibold">
+                                ₹{{ entry.closing_balance|floatformat:2 }}
+                            </td>
+
+                        </tr>
+
+                        {% empty %}
+
+                        <tr>
+                            <td
+                                colspan="7"
+                                class="text-center text-muted py-4"
+                            >
+                                No transactions found.
+                            </td>
+                        </tr>
+
+                        {% endfor %}
+
+                    </tbody>
+
+                </table>
+
+            </div>
+
+        </div>
+
+    </div>
+
+</div>
+
+<!-- Download Ledger Modal -->
+<div
+    class="modal fade"
+    id="downloadLedgerModal"
+    tabindex="-1"
+    aria-labelledby="downloadLedgerModalLabel"
+    aria-hidden="true"
+>
+    <div class="modal-dialog">
+        <div class="modal-content">
+
+            <div class="modal-header">
+                <h5 class="modal-title" id="downloadLedgerModalLabel">
+                    <i class="fas fa-download"></i>
+                    Download Vendor Ledger
+                </h5>
+
+                <button
+                    type="button"
+                    class="btn-close"
+                    data-bs-dismiss="modal"
+                    aria-label="Close"
+                ></button>
+            </div>
+
+            <form method="GET" action="{% url 'vendor_ledger_download' vendor.id %}">
+
+                <div class="modal-body">
+
+                    <div class="mb-3">
+                        <label for="from_date" class="form-label">
+                            From Date
+                        </label>
+
+                        <input
+                            type="date"
+                            class="form-control"
+                            id="from_date"
+                            name="from_date"
+                            required
+                        >
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="to_date" class="form-label">
+                            To Date
+                        </label>
+
+                        <input
+                            type="date"
+                            class="form-control"
+                            id="to_date"
+                            name="to_date"
+                            required
+                        >
+                    </div>
+
+                </div>
+
+                <div class="modal-footer">
+
+                    <button
+                        type="button"
+                        class="btn btn-secondary"
+                        data-bs-dismiss="modal"
+                    >
+                        Cancel
+                    </button>
+
+                    <button
+                        type="submit"
+                        class="btn btn-primary"
+                    >
+                        <i class="fas fa-file-excel"></i>
+                        Download Excel
+                    </button>
+
+                </div>
+
+            </form>
+
+        </div>
+    </div>
+</div>
+
+<!-- Add Vendor Transaction Modal -->
+<div
+    class="modal fade"
+    id="addVendorTransactionModal"
+    tabindex="-1"
+    aria-labelledby="addVendorTransactionModalLabel"
+    aria-hidden="true"
+>
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+
+            <div class="modal-header">
+
+                <h5
+                    class="modal-title"
+                    id="addVendorTransactionModalLabel"
+                >
+                    <i class="fas fa-money-bill-wave me-2"></i>
+                    Add Vendor Transaction
+                </h5>
+
+                <button
+                    type="button"
+                    class="btn-close"
+                    data-bs-dismiss="modal"
+                    aria-label="Close"
+                ></button>
+
+            </div>
+
+
+            <form
+                method="POST"
+                action="{% url 'vendor_transaction_add' vendor.id %}"
+                enctype="multipart/form-data"
+            >
+
+                {% csrf_token %}
+
+                <div class="modal-body">
+
+                    <!-- Transaction Type -->
+                    <div class="mb-3">
+
+                        <label class="form-label">
+                            Transaction Type
+                        </label>
+
+                        <select
+                            name="transaction_type"
+                            id="vendorTransactionType"
+                            class="form-select"
+                            required
+                        >
+                            <option value="payment">
+                                Payment
+                            </option>
+
+                            <option value="return">
+                                Purchase Return
+                            </option>
+                        </select>
+
+                    </div>
+
+
+                    <div class="row">
+
+                        <!-- Date -->
+                        <div class="col-md-6 mb-3">
+
+                            <label
+                                for="vendorTransactionDate"
+                                class="form-label"
+                            >
+                                Date
+                            </label>
+
+                            <input
+                                type="date"
+                                name="transaction_date"
+                                id="vendorTransactionDate"
+                                class="form-control"
+                                value="{% now 'Y-m-d' %}"
+                                required
+                            >
+
+                        </div>
+
+
+                        <!-- Amount -->
+                        <div class="col-md-6 mb-3">
+
+                            <label
+                                for="vendorTransactionAmount"
+                                class="form-label"
+                            >
+                                Amount
+                            </label>
+
+                            <div class="input-group">
+
+                                <span class="input-group-text">
+                                    ₹
+                                </span>
+
+                                <input
+                                    type="number"
+                                    name="amount"
+                                    id="vendorTransactionAmount"
+                                    class="form-control"
+                                    min="0.01"
+                                    step="0.01"
+                                    placeholder="0.00"
+                                    required
+                                >
+
+                            </div>
+
+                        </div>
+
+                    </div>
+
+
+                    <!-- Payment Mode -->
+                    <div
+                        class="mb-3"
+                        id="paymentModeContainer"
+                    >
+
+                        <label
+                            for="vendorPaymentMode"
+                            class="form-label"
+                        >
+                            Payment Mode
+                        </label>
+
+                        <select
+                            name="mode"
+                            id="vendorPaymentMode"
+                            class="form-select"
+                        >
+
+                            <option value="cash">
+                                Cash
+                            </option>
+
+                            <option value="bank">
+                                Bank
+                            </option>
+
+                            <option value="upi">
+                                UPI
+                            </option>
+
+                            <option value="credit_card">
+                                Credit Card
+                            </option>
+
+                        </select>
+
+                    </div>
+
+
+                    <!-- Purchase Invoice -->
+                    <div class="mb-3">
+
+                        <label
+                            for="vendorInvoice"
+                            class="form-label"
+                        >
+                            Against Purchase Invoice
+                            <span class="text-muted">(Optional)</span>
+                        </label>
+
+                        <select
+                            name="against_invoice"
+                            id="vendorInvoice"
+                            class="form-select"
+                        >
+
+                            <option value="">
+                                -- Select Invoice --
+                            </option>
+
+                            {% for invoice in vendor.invoices.all %}
+
+                                <option value="{{ invoice.id }}">
+                                    {{ invoice.invoice_number }}
+                                    -
+                                    ₹{{ invoice.grand_total|floatformat:2 }}
+                                    -
+                                    {{ invoice.invoice_date|date:"d-m-Y" }}
+                                </option>
+
+                            {% endfor %}
+
+                        </select>
+
+                    </div>
+
+
+                    <!-- Reference -->
+                    <div class="mb-3">
+
+                        <label
+                            for="vendorTransactionReference"
+                            class="form-label"
+                        >
+                            Reference
+                            <span class="text-muted">(Optional)</span>
+                        </label>
+
+                        <input
+                            type="text"
+                            name="reference"
+                            id="vendorTransactionReference"
+                            class="form-control"
+                            placeholder="e.g. NEFT-458921 / PR-0012"
+                            maxlength="100"
+                        >
+
+                    </div>
+
+
+                    <!-- Remark -->
+                    <div class="mb-3">
+
+                        <label
+                            for="vendorTransactionRemark"
+                            class="form-label"
+                        >
+                            Remark
+                            <span class="text-muted">(Optional)</span>
+                        </label>
+
+                        <textarea
+                            name="remark"
+                            id="vendorTransactionRemark"
+                            class="form-control"
+                            rows="3"
+                            placeholder="Enter any additional details..."
+                        ></textarea>
+
+                    </div>
+
+
+                    <!-- Attachment -->
+                    <div class="mb-3">
+
+                        <label
+                            for="vendorTransactionAttachment"
+                            class="form-label"
+                        >
+                            Attachment
+                            <span class="text-muted">(Optional)</span>
+                        </label>
+
+                        <input
+                            type="file"
+                            name="attachment"
+                            id="vendorTransactionAttachment"
+                            class="form-control"
+                        >
+
+                        <div class="form-text">
+                            Upload payment receipt, return note,
+                            bank slip, etc.
+                        </div>
+
+                    </div>
+
+
+                    <!-- Accounting Info -->
+                    <div class="alert alert-info mb-0">
+
+                        <i class="fas fa-info-circle me-1"></i>
+
+                        <strong>Accounting:</strong>
+
+                        <span id="transactionAccountingText">
+                            This payment will be recorded as a Debit
+                            and will reduce the vendor payable balance.
+                        </span>
+
+                    </div>
+
+                </div>
+
+
+                <div class="modal-footer">
+
+                    <button
+                        type="button"
+                        class="btn btn-secondary"
+                        data-bs-dismiss="modal"
+                    >
+                        Cancel
+                    </button>
+
+                    <button
+                        type="submit"
+                        class="btn btn-primary"
+                    >
+                        <i class="fas fa-save me-1"></i>
+                        Save Transaction
+                    </button>
+
+                </div>
+
+            </form>
+
+        </div>
+    </div>
+</div>
+
+<!-- Email Vendor Ledger Modal -->
+
+<div
+    class="modal fade"
+    id="emailVendorLedgerModal"
+    tabindex="-1"
+    aria-labelledby="emailVendorLedgerModalLabel"
+    aria-hidden="true"
+>
+
+    <div class="modal-dialog">
+
+        <div class="modal-content">
+
+            <div class="modal-header">
+
+                <h5
+                    class="modal-title"
+                    id="emailVendorLedgerModalLabel"
+                >
+                    <i class="fas fa-envelope me-2"></i>
+                    Email Vendor Ledger
+                </h5>
+
+                <button
+                    type="button"
+                    class="btn-close"
+                    data-bs-dismiss="modal"
+                    aria-label="Close"
+                ></button>
+
+            </div>
+
+
+            <form
+                method="POST"
+                action="{% url 'vendor_ledger_email' vendor.id %}"
+            >
+
+                {% csrf_token %}
+
+                <div class="modal-body">
+
+                    <!-- Email -->
+                    <div class="mb-3">
+
+                        <label
+                            for="vendorEmail"
+                            class="form-label"
+                        >
+                            Vendor Email
+                        </label>
+
+                        <input
+                            type="email"
+                            name="email"
+                            id="vendorEmail"
+                            class="form-control"
+                            value="{{ vendor.email }}"
+                            required
+                        >
+
+                    </div>
+
+
+                    <div class="row">
+
+                        <!-- From Date -->
+                        <div class="col-md-6 mb-3">
+
+                            <label
+                                for="emailFromDate"
+                                class="form-label"
+                            >
+                                From Date
+                            </label>
+
+                            <input
+                                type="date"
+                                name="from_date"
+                                id="emailFromDate"
+                                class="form-control"
+                                required
+                            >
+
+                        </div>
+
+
+                        <!-- To Date -->
+                        <div class="col-md-6 mb-3">
+
+                            <label
+                                for="emailToDate"
+                                class="form-label"
+                            >
+                                To Date
+                            </label>
+
+                            <input
+                                type="date"
+                                name="to_date"
+                                id="emailToDate"
+                                class="form-control"
+                                required
+                            >
+
+                        </div>
+
+                    </div>
+
+
+                    <div class="alert alert-info mb-0">
+
+                        <i class="fas fa-info-circle me-1"></i>
+
+                        The vendor ledger for the selected period
+                        will be generated as an Excel file and
+                        attached to the email.
+
+                    </div>
+
+                </div>
+
+
+                <div class="modal-footer">
+
+                    <button
+                        type="button"
+                        class="btn btn-secondary"
+                        data-bs-dismiss="modal"
+                    >
+                        Cancel
+                    </button>
+
+                    <button
+                        type="submit"
+                        class="btn btn-primary"
+                    >
+                        <i class="fas fa-paper-plane me-1"></i>
+                        Send Ledger
+                    </button>
+
+                </div>
+
+            </form>
+
+        </div>
+
+    </div>
+
+</div>
+
+<script>
+
+document.addEventListener("DOMContentLoaded", function () {
+
+    const transactionType = document.getElementById(
+        "vendorTransactionType"
+    );
+
+    const paymentModeContainer = document.getElementById(
+        "paymentModeContainer"
+    );
+
+    const paymentMode = document.getElementById(
+        "vendorPaymentMode"
+    );
+
+    const accountingText = document.getElementById(
+        "transactionAccountingText"
+    );
+
+
+    function updateTransactionForm() {
+
+        if (transactionType.value === "payment") {
+
+            paymentModeContainer.style.display = "block";
+
+            paymentMode.disabled = false;
+
+            accountingText.textContent =
+                "This payment will be recorded as a Debit and will reduce the vendor payable balance.";
+
+        } else {
+
+            paymentModeContainer.style.display = "none";
+
+            paymentMode.disabled = true;
+
+            accountingText.textContent =
+                "This purchase return will be recorded as a Debit and will reduce the vendor payable balance.";
+
+        }
+
+    }
+
+
+    transactionType.addEventListener(
+        "change",
+        updateTransactionForm
+    );
+
+
+    updateTransactionForm();
+
+});
+
+</script>
+
+{% endblock %}

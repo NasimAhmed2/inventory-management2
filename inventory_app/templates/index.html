@@ -12,33 +12,39 @@
         </div>
     </div>
 
+
     <!-- Key Statistics -->
     <div class="row">
         <div class="col-md-3">
             <div class="stats-card">
                 <h5><i class="fas fa-box"></i> Total Products</h5>
-                <div class="value">0</div>
+                <div class="value">{{ product_count }}</div>
             </div>
         </div>
+
         <div class="col-md-3">
             <div class="stats-card" style="border-left-color: #f093fb;">
                 <h5><i class="fas fa-building"></i> Total Vendors</h5>
-                <div class="value">0</div>
+                <div class="value">{{ vendor_count }}</div>
             </div>
         </div>
+
         <div class="col-md-3">
             <div class="stats-card" style="border-left-color: #4facfe;">
                 <h5><i class="fas fa-users"></i> Total Customers</h5>
-                <div class="value">0</div>
+                <div class="value">{{ customer_count }}</div>
             </div>
         </div>
+
         <div class="col-md-3">
             <div class="stats-card" style="border-left-color: #43e97b;">
                 <h5><i class="fas fa-warehouse"></i> Stock Value</h5>
-                <div class="value">₹0</div>
+                <div class="value">₹{{ total_stock_value|floatformat:2 }}</div>
             </div>
         </div>
     </div>
+
+
 
     <div class="row mt-4">
         <div class="col-md-6">
@@ -59,9 +65,20 @@
                             </tr>
                         </thead>
                         <tbody>
+                            {% for purchase in recent_purchases %}
                             <tr>
-                                <td colspan="4" class="text-center text-muted">No data available</td>
+                                <td>{{ purchase.invoice_number }}</td>
+                                <td>{{ purchase.vendor.name }}</td>
+                                <td>₹{{ purchase.grand_total|floatformat:2 }}</td>
+                                <td>{{ purchase.invoice_date|date:"d-m-Y" }}</td>
                             </tr>
+                            {% empty %}
+                            <tr>
+                                <td colspan="4" class="text-center text-muted">
+                                    No data available
+                                </td>
+                            </tr>
+                            {% endfor %}
                         </tbody>
                     </table>
                 </div>
@@ -86,9 +103,20 @@
                             </tr>
                         </thead>
                         <tbody>
+                            {% for sale in recent_sales %}
                             <tr>
-                                <td colspan="4" class="text-center text-muted">No data available</td>
+                                <td>{{ sale.invoice_number }}</td>
+                                <td>{{ sale.customer.name }}</td>
+                                <td>₹{{ sale.grand_total|floatformat:2 }}</td>
+                                <td>{{ sale.get_status_display }}</td>
                             </tr>
+                            {% empty %}
+                            <tr>
+                                <td colspan="4" class="text-center text-muted">
+                                    No data available
+                                </td>
+                            </tr>
+                            {% endfor %}
                         </tbody>
                     </table>
                 </div>
@@ -116,9 +144,27 @@
                             </tr>
                         </thead>
                         <tbody>
+                            {% for stock in low_stock_items %}
                             <tr>
-                                <td colspan="5" class="text-center text-muted">No low stock items</td>
+                                <td>{{ stock.product.item_code }}</td>
+                                <td>{{ stock.product.item_name }}</td>
+                                <td>{{ stock.quantity_on_hand }}</td>
+                                <td>{{ stock.product.reorder_level }}</td>
+                                <td>
+                                    {% if stock.stock_status == "Critical" %}
+                                        <span class="badge bg-danger">Critical</span>
+                                    {% else %}
+                                        <span class="badge bg-warning text-dark">Low</span>
+                                    {% endif %}
+                                </td>
                             </tr>
+                            {% empty %}
+                            <tr>
+                                <td colspan="5" class="text-center text-muted">
+                                    No low stock items
+                                </td>
+                            </tr>
+                            {% endfor %}
                         </tbody>
                     </table>
                 </div>

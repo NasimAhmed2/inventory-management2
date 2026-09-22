@@ -20,6 +20,10 @@ urlpatterns = [
         name="product_delete",
     ),
     path("purchases/vendors/", views.purchases_vendors, name="purchases_vendors"),
+    path("vendors/<int:vendor_id>/ledger/",views.vendor_ledger,name="vendor_ledger"),
+    path("vendors/<int:vendor_id>/ledger/download/",views.vendor_ledger_download,name="vendor_ledger_download"),
+    path("vendors/<int:vendor_id>/ledger/email/",views.vendor_ledger_email,name="vendor_ledger_email"),
+    path("vendors/<int:vendor_id>/ledger/add/",views.vendor_transaction_add,name="vendor_transaction_add"),
     path("purchases/invoices/", views.purchases_invoices, name="purchases_invoices"),
     path("purchases/invoices/<int:invoice_id>/pdf/", views.purchase_invoice_pdf, name="purchase_invoice_pdf"),
 

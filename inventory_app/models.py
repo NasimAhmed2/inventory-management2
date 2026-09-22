@@ -30,6 +30,7 @@ class Vendor(models.Model):
     mobile = models.CharField(max_length=20, blank=True)
     email = models.EmailField(blank=True)
     address = models.TextField(blank=True)
+    opening_balance = models.DecimalField(max_digits=15, decimal_places=2, default=0)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -88,6 +89,94 @@ class PurchaseLineItem(models.Model):
 
 
 
+
+class VendorLedger(models.Model):
+    PAYMENT_MODE_CHOICES = [
+        ("cash", "Cash"),
+        ("bank", "Bank"),
+        ("upi", "UPI"),
+        ("credit_card", "Credit Card"),
+    ]
+
+    TRANSACTION_TYPE_CHOICES = [
+        ("opening", "Opening Balance"),
+        ("purchase", "Purchase"),
+        ("payment", "Payment"),
+        ("return", "Purchase Return"),
+    ]
+    vendor = models.ForeignKey(
+        Vendor,
+        on_delete=models.CASCADE,
+        related_name="ledger_entries",
+    )
+
+    transaction_date = models.DateField()
+
+    transaction_type = models.CharField(
+        max_length=20,
+        choices=TRANSACTION_TYPE_CHOICES,
+    )
+
+    amount = models.DecimalField(
+        max_digits=15,
+        decimal_places=2,
+        default=0,
+    )
+
+    mode = models.CharField(
+        max_length=20,
+        choices=PAYMENT_MODE_CHOICES,
+        null=True,
+        blank=True,
+    )
+
+    against_invoice = models.ForeignKey(
+        PurchaseInvoice,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="ledger_entries",
+    )
+
+    reference = models.CharField(
+        max_length=100,
+        blank=True,
+    )
+
+    remark = models.TextField(blank=True)
+
+    attachment = models.FileField(
+        upload_to="vendor_ledger/",
+        blank=True,
+        null=True,
+    )
+
+    dr = models.DecimalField(
+        max_digits=15,
+        decimal_places=2,
+        default=0,
+    )
+
+    cr = models.DecimalField(
+        max_digits=15,
+        decimal_places=2,
+        default=0,
+    )
+
+    closing_balance = models.DecimalField(
+        max_digits=15,
+        decimal_places=2,
+        default=0,
+    )
+
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = "vendor_ledgers"
+        ordering = ["-transaction_date", "-id"]
+
+    def __str__(self):
+        return f"{self.vendor.name} - {self.transaction_type} - {self.amount}"
 
 
 class Product(models.Model):

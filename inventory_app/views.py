@@ -2,7 +2,7 @@ import os
 import re
 import uuid
 from datetime import datetime
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation
 from django.views.decorators.http import require_POST
 from django.conf import settings
 from django.contrib import messages
@@ -15,6 +15,7 @@ from django.core.paginator import Paginator
 from .models import Product, InventoryStock, InventoryMovement
 from django.utils import timezone
 from django.db import transaction
+from django.db.models import F
 from .models import (
     Product, 
     PurchaseInvoice, 
@@ -25,6 +26,7 @@ from .models import (
     Customer,
     Ticket,
     SalesInvoice,
+    VendorLedger,
     
 )
 from .services import (
@@ -32,14 +34,21 @@ from .services import (
     CustomerService, 
     TicketService, 
     ServiceReportService,
-    SaleService
+    SaleService,
+    VendorLedgerService,
+    VendorLedgerEmailService,
 )
+
 
 from django.shortcuts import render, redirect, get_object_or_404
 import json
-from datetime import date
+from datetime import date, datetime
 from django.http import JsonResponse
 from django.contrib.auth.decorators import login_required
+from django.http import HttpResponse
+
+from openpyxl import Workbook
+from openpyxl.styles import Font, Alignment
 
 from .forms import ProductForm
 from .constants import CATEGORY_HSN
@@ -374,54 +383,169 @@ def customer_lookup(request):
     )
 
 
+@login_required
 def purchases_vendors(request):
+
     query = request.GET.get("q", "").strip()
+
     vendors = Vendor.objects.all()
+
     if query:
-        vendors = vendors.filter(Q(vendor_code__icontains=query) | Q(name__icontains=query))
+        vendors = vendors.filter(
+            Q(vendor_code__icontains=query) |
+            Q(name__icontains=query)
+        )
 
     vendor_to_edit = None
+
     edit_id = request.GET.get("edit")
+
     if edit_id:
-        vendor_to_edit = Vendor.objects.filter(pk=edit_id).first()
+        vendor_to_edit = Vendor.objects.filter(
+            pk=edit_id
+        ).first()
 
     if request.method == "POST":
+
         vendor_id = request.POST.get("vendor_id")
-        vendor_code = request.POST.get("vendor_code", "").strip().lower()
-        name = request.POST.get("name", "").strip()
-        pan = request.POST.get("pan", "").strip()
-        vat_number = request.POST.get("vat_number", "").strip()
-        mobile = request.POST.get("mobile", "").strip()
-        email = request.POST.get("email", "").strip()
-        address = request.POST.get("address", "").strip()
+
+        vendor_code = request.POST.get(
+            "vendor_code", ""
+        ).strip().lower()
+
+        name = request.POST.get(
+            "name", ""
+        ).strip()
+
+        pan = request.POST.get(
+            "pan", ""
+        ).strip()
+
+        vat_number = request.POST.get(
+            "vat_number", ""
+        ).strip()
+
+        mobile = request.POST.get(
+            "mobile", ""
+        ).strip()
+
+        email = request.POST.get(
+            "email", ""
+        ).strip()
+
+        address = request.POST.get(
+            "address", ""
+        ).strip()
+
+        opening_balance = request.POST.get(
+            "opening_balance", "0"
+        ).strip()
+        opening_balance_type = request.POST.get(
+            "opening_balance_type",
+            "DR"
+        ).strip().upper()
 
         if not name:
-            messages.error(request, "Vendor name is required.")
+            messages.error(
+                request,
+                "Vendor name is required."
+            )
+
         else:
+
             if vendor_id:
-                vendor = Vendor.objects.get(pk=vendor_id)
+
+                # =========================
+                # UPDATE VENDOR
+                # =========================
+
+                vendor = Vendor.objects.get(
+                    pk=vendor_id
+                )
+
                 vendor.name = name
                 vendor.pan = pan
                 vendor.vat_number = vat_number
                 vendor.mobile = mobile
                 vendor.email = email
                 vendor.address = address
+
                 if vendor_code:
                     vendor.vendor_code = vendor_code
+
                 vendor.save()
-                messages.success(request, "Vendor updated successfully.")
-            else:
-                vendor_code = vendor_code or generate_vendor_code()
-                Vendor.objects.create(
-                    vendor_code=vendor_code,
-                    name=name,
-                    pan=pan,
-                    vat_number=vat_number,
-                    mobile=mobile,
-                    email=email,
-                    address=address,
+
+                messages.success(
+                    request,
+                    "Vendor updated successfully."
                 )
-                messages.success(request, "Vendor created successfully.")
+
+            else:
+
+                # =========================
+                # CREATE VENDOR
+                # =========================
+                opening_balance_amount = Decimal(opening_balance or "0")
+                with transaction.atomic():
+
+                    vendor_code = (
+                        vendor_code
+                        or generate_vendor_code()
+                    )
+
+                    vendor = Vendor.objects.create(
+                        vendor_code=vendor_code,
+                        name=name,
+                        pan=pan,
+                        vat_number=vat_number,
+                        mobile=mobile,
+                        email=email,
+                        address=address,
+                        opening_balance=opening_balance_amount
+                    )
+
+                    # =========================
+                    # OPENING BALANCE LEDGER
+                    # =========================
+
+                    if opening_balance_amount != 0:
+
+                        if opening_balance_type == "DR":
+                            dr_amount = opening_balance_amount
+                            cr_amount = Decimal("0.00")
+
+                            closing_balance = opening_balance_amount
+
+                        else:  # CR
+                            dr_amount = Decimal("0.00")
+                            cr_amount = opening_balance_amount
+
+                            closing_balance = -opening_balance_amount
+
+                        VendorLedger.objects.create(
+                            vendor=vendor,
+
+                            transaction_date=timezone.now().date(),
+
+                            transaction_type="opening",
+
+                            amount=opening_balance_amount,
+
+                            mode=None,
+
+                            remark="Opening Balance",
+
+                            dr=dr_amount,
+
+                            cr=cr_amount,
+
+                            closing_balance=closing_balance,
+                        )
+                messages.success(
+                    request,
+                    "Vendor created successfully."
+                )
+
         return redirect("purchases_vendors")
 
     context = {
@@ -430,8 +554,749 @@ def purchases_vendors(request):
         "vendor_to_edit": vendor_to_edit,
         "next_vendor_code": generate_vendor_code(),
     }
-    return render(request, "purchases_vendors.html", context)
 
+    return render(
+        request,
+        "purchases_vendors.html",
+        context
+    )
+
+@login_required
+def vendor_ledger_download(request, vendor_id):
+
+    vendor = get_object_or_404(
+        Vendor,
+        pk=vendor_id
+    )
+
+    from_date = request.GET.get("from_date")
+    to_date = request.GET.get("to_date")
+
+    if not from_date or not to_date:
+        messages.error(
+            request,
+            "Please select both dates."
+        )
+        return redirect(
+            "vendor_ledger",
+            vendor_id=vendor.id
+        )
+
+    try:
+        from_date = datetime.strptime(
+            from_date,
+            "%Y-%m-%d"
+        ).date()
+
+        to_date = datetime.strptime(
+            to_date,
+            "%Y-%m-%d"
+        ).date()
+
+    except ValueError:
+
+        messages.error(
+            request,
+            "Invalid date."
+        )
+
+        return redirect(
+            "vendor_ledger",
+            vendor_id=vendor.id
+        )
+
+    if from_date > to_date:
+
+        messages.error(
+            request,
+            "From date cannot be after To date."
+        )
+
+        return redirect(
+            "vendor_ledger",
+            vendor_id=vendor.id
+        )
+
+    # ==========================================
+    # BALANCE BEFORE SELECTED PERIOD
+    # ==========================================
+
+    previous_transaction = VendorLedger.objects.filter(
+        vendor=vendor,
+        transaction_date__lt=from_date,
+    ).order_by(
+        "-transaction_date",
+        "-id",
+    ).first()
+
+    opening_balance = (
+        previous_transaction.closing_balance
+        if previous_transaction
+        else Decimal("0.00")
+    )
+
+    # ==========================================
+    # TRANSACTIONS DURING SELECTED PERIOD
+    # ==========================================
+
+    transactions = VendorLedger.objects.filter(
+        vendor=vendor,
+        transaction_date__gte=from_date,
+        transaction_date__lte=to_date,
+    ).select_related(
+        "against_invoice"
+    ).order_by(
+        "transaction_date",
+        "id",
+    )
+
+    # ==========================================
+    # CREATE EXCEL
+    # ==========================================
+
+    workbook = Workbook()
+    worksheet = workbook.active
+    worksheet.title = "Vendor Ledger"
+
+    # Vendor information
+    worksheet["A1"] = "Vendor Ledger"
+    worksheet["A1"].font = Font(
+        bold=True,
+        size=16
+    )
+
+    worksheet["A3"] = "Vendor"
+    worksheet["B3"] = vendor.name
+
+    worksheet["A4"] = "Vendor Code"
+    worksheet["B4"] = vendor.vendor_code
+
+    worksheet["A5"] = "Period"
+    worksheet["B5"] = (
+        f"{from_date.strftime('%d-%m-%Y')} "
+        f"to "
+        f"{to_date.strftime('%d-%m-%Y')}"
+    )
+
+    worksheet["A6"] = "Opening Balance"
+    worksheet["B6"] = opening_balance
+
+    # ==========================================
+    # TABLE HEADER
+    # ==========================================
+
+    header_row = 8
+
+    headers = [
+        "Date",
+        "Transaction",
+        "Invoice",
+        "Mode",
+        "Remark",
+        "Debit",
+        "Credit",
+        "Balance",
+    ]
+
+    for column, header in enumerate(headers, start=1):
+
+        cell = worksheet.cell(
+            row=header_row,
+            column=column,
+            value=header,
+        )
+
+        cell.font = Font(bold=True)
+        cell.alignment = Alignment(
+            horizontal="center"
+        )
+
+    # ==========================================
+    # TRANSACTIONS
+    # ==========================================
+
+    row = header_row + 1
+
+    running_balance = opening_balance
+
+    for entry in transactions:
+
+        running_balance += entry.cr
+        running_balance -= entry.dr
+
+        invoice_number = ""
+
+        if entry.against_invoice:
+            invoice_number = (
+                entry.against_invoice.invoice_number
+            )
+
+        worksheet.cell(
+            row=row,
+            column=1,
+            value=entry.transaction_date,
+        )
+
+        worksheet.cell(
+            row=row,
+            column=2,
+            value=entry.get_transaction_type_display(),
+        )
+
+        worksheet.cell(
+            row=row,
+            column=3,
+            value=invoice_number,
+        )
+
+        worksheet.cell(
+            row=row,
+            column=4,
+            value=entry.get_mode_display()
+            if entry.mode
+            else "",
+        )
+
+        worksheet.cell(
+            row=row,
+            column=5,
+            value=entry.remark or "",
+        )
+
+        worksheet.cell(
+            row=row,
+            column=6,
+            value=entry.dr,
+        )
+
+        worksheet.cell(
+            row=row,
+            column=7,
+            value=entry.cr,
+        )
+
+        worksheet.cell(
+            row=row,
+            column=8,
+            value=running_balance,
+        )
+
+        row += 1
+
+    # ==========================================
+    # FINAL BALANCE
+    # ==========================================
+
+    worksheet.cell(
+        row=row + 1,
+        column=1,
+        value="Closing Balance",
+    )
+
+    worksheet.cell(
+        row=row + 1,
+        column=1,
+    ).font = Font(bold=True)
+
+    worksheet.cell(
+        row=row + 1,
+        column=2,
+        value=running_balance,
+    )
+
+    worksheet.cell(
+        row=row + 1,
+        column=2,
+    ).font = Font(bold=True)
+
+    # ==========================================
+    # FORMATTING
+    # ==========================================
+
+    for row_cells in worksheet.iter_rows(
+        min_row=header_row,
+        max_row=row,
+    ):
+
+        for cell in row_cells:
+
+            cell.alignment = Alignment(
+                vertical="center"
+            )
+
+    # Date format
+    for cell in worksheet["A"]:
+
+        if hasattr(cell.value, "strftime"):
+            cell.number_format = "DD-MM-YYYY"
+
+    # Amount columns
+    for column in ["B", "F", "G", "H"]:
+
+        for cell in worksheet[column]:
+
+            if isinstance(
+                cell.value,
+                (int, float, Decimal)
+            ):
+                cell.number_format = '#,##0.00'
+
+    # Column widths
+    worksheet.column_dimensions["A"].width = 15
+    worksheet.column_dimensions["B"].width = 20
+    worksheet.column_dimensions["C"].width = 20
+    worksheet.column_dimensions["D"].width = 15
+    worksheet.column_dimensions["E"].width = 35
+    worksheet.column_dimensions["F"].width = 15
+    worksheet.column_dimensions["G"].width = 15
+    worksheet.column_dimensions["H"].width = 18
+
+    # ==========================================
+    # RESPONSE
+    # ==========================================
+
+    filename = (
+        f"{vendor.vendor_code}_ledger_"
+        f"{from_date.strftime('%Y%m%d')}_"
+        f"{to_date.strftime('%Y%m%d')}.xlsx"
+    )
+
+    response = HttpResponse(
+        content_type=(
+            "application/vnd.openxmlformats-officedocument"
+            ".spreadsheetml.sheet"
+        )
+    )
+
+    response["Content-Disposition"] = (
+        f'attachment; filename="{filename}"'
+    )
+
+    workbook.save(response)
+
+    return response
+
+@login_required
+def vendor_ledger_email(request, vendor_id):
+
+    vendor = get_object_or_404(
+        Vendor,
+        pk=vendor_id
+    )
+
+
+    if request.method != "POST":
+
+        return redirect(
+            "vendor_ledger",
+            vendor_id=vendor.id
+        )
+
+
+    recipient_email = request.POST.get(
+        "email",
+        ""
+    ).strip()
+
+    from_date_value = request.POST.get(
+        "from_date",
+        ""
+    ).strip()
+
+    to_date_value = request.POST.get(
+        "to_date",
+        ""
+    ).strip()
+
+
+    # ==========================================
+    # Validate Email
+    # ==========================================
+
+    if not recipient_email:
+
+        messages.error(
+            request,
+            "Vendor email address is required."
+        )
+
+        return redirect(
+            "vendor_ledger",
+            vendor_id=vendor.id
+        )
+
+
+    # ==========================================
+    # Validate Dates
+    # ==========================================
+
+    try:
+
+        from_date = datetime.strptime(
+            from_date_value,
+            "%Y-%m-%d"
+        ).date()
+
+        to_date = datetime.strptime(
+            to_date_value,
+            "%Y-%m-%d"
+        ).date()
+
+    except ValueError:
+
+        messages.error(
+            request,
+            "Please select valid dates."
+        )
+
+        return redirect(
+            "vendor_ledger",
+            vendor_id=vendor.id
+        )
+
+
+    if from_date > to_date:
+
+        messages.error(
+            request,
+            "From date cannot be after To date."
+        )
+
+        return redirect(
+            "vendor_ledger",
+            vendor_id=vendor.id
+        )
+
+
+    # ==========================================
+    # Generate Excel
+    # ==========================================
+
+    excel_data = VendorLedgerService.generate_excel(
+        vendor=vendor,
+        from_date=from_date,
+        to_date=to_date,
+    )
+
+
+    filename = (
+        f"{vendor.vendor_code}_ledger_"
+        f"{from_date.strftime('%Y%m%d')}_"
+        f"{to_date.strftime('%Y%m%d')}.xlsx"
+    )
+
+
+    # ==========================================
+    # Send Email
+    # ==========================================
+
+    try:
+
+        VendorLedgerEmailService.send_ledger(
+            vendor=vendor,
+            recipient_email=recipient_email,
+            from_date=from_date,
+            to_date=to_date,
+            excel_file=excel_data,
+            filename=filename,
+        )
+
+    except Exception as e:
+
+        messages.error(
+            request,
+            f"Unable to send email: {str(e)}"
+        )
+
+        return redirect(
+            "vendor_ledger",
+            vendor_id=vendor.id
+        )
+
+
+    messages.success(
+        request,
+        f"Vendor ledger emailed successfully to {recipient_email}."
+    )
+
+
+    return redirect(
+        "vendor_ledger",
+        vendor_id=vendor.id
+    )
+
+@login_required
+@transaction.atomic
+def vendor_transaction_add(request, vendor_id):
+
+    vendor = get_object_or_404(
+        Vendor,
+        pk=vendor_id
+    )
+
+    if request.method != "POST":
+        return redirect(
+            "vendor_ledger",
+            vendor_id=vendor.id
+        )
+
+
+    # ==========================================
+    # Get form values
+    # ==========================================
+
+    transaction_type = request.POST.get(
+        "transaction_type",
+        ""
+    ).strip()
+
+    transaction_date_value = request.POST.get(
+        "transaction_date",
+        ""
+    ).strip()
+
+    amount_value = request.POST.get(
+        "amount",
+        ""
+    ).strip()
+
+    mode = request.POST.get(
+        "mode",
+        ""
+    ).strip()
+
+    invoice_id = request.POST.get(
+        "against_invoice",
+        ""
+    ).strip()
+
+    reference = request.POST.get(
+        "reference",
+        ""
+    ).strip()
+
+    remark = request.POST.get(
+        "remark",
+        ""
+    ).strip()
+
+    attachment = request.FILES.get(
+        "attachment"
+    )
+
+
+    # ==========================================
+    # Validate transaction type
+    # ==========================================
+
+    if transaction_type not in [
+        "payment",
+        "return",
+    ]:
+
+        messages.error(
+            request,
+            "Invalid transaction type."
+        )
+
+        return redirect(
+            "vendor_ledger",
+            vendor_id=vendor.id
+        )
+
+
+    # ==========================================
+    # Validate date
+    # ==========================================
+
+    try:
+
+        transaction_date = datetime.strptime(
+            transaction_date_value,
+            "%Y-%m-%d"
+        ).date()
+
+    except (ValueError, TypeError):
+
+        messages.error(
+            request,
+            "Please enter a valid transaction date."
+        )
+
+        return redirect(
+            "vendor_ledger",
+            vendor_id=vendor.id
+        )
+
+
+    # ==========================================
+    # Validate amount
+    # ==========================================
+
+    try:
+
+        amount = Decimal(amount_value)
+
+    except (InvalidOperation, TypeError):
+
+        messages.error(
+            request,
+            "Please enter a valid amount."
+        )
+
+        return redirect(
+            "vendor_ledger",
+            vendor_id=vendor.id
+        )
+
+
+    if amount <= 0:
+
+        messages.error(
+            request,
+            "Amount must be greater than zero."
+        )
+
+        return redirect(
+            "vendor_ledger",
+            vendor_id=vendor.id
+        )
+
+
+    # ==========================================
+    # Payment mode
+    # ==========================================
+
+    if transaction_type == "payment":
+
+        valid_modes = [
+            "cash",
+            "bank",
+            "upi",
+            "credit_card",
+        ]
+
+        if mode not in valid_modes:
+
+            messages.error(
+                request,
+                "Please select a valid payment mode."
+            )
+
+            return redirect(
+                "vendor_ledger",
+                vendor_id=vendor.id
+            )
+
+    else:
+
+        # Purchase return has no payment mode
+        mode = None
+
+
+    # ==========================================
+    # Optional invoice
+    # ==========================================
+
+    against_invoice = None
+
+    if invoice_id:
+
+        against_invoice = PurchaseInvoice.objects.filter(
+            pk=invoice_id,
+            vendor=vendor,
+        ).first()
+
+        if not against_invoice:
+
+            messages.error(
+                request,
+                "Selected invoice does not belong to this vendor."
+            )
+
+            return redirect(
+                "vendor_ledger",
+                vendor_id=vendor.id
+            )
+
+
+    # ==========================================
+    # Accounting
+    # ==========================================
+
+    # Vendor payable:
+    #
+    # Purchase        -> CR
+    # Payment         -> DR
+    # Purchase Return -> DR
+
+    dr = amount
+    cr = Decimal("0.00")
+
+
+    # ==========================================
+    # Create ledger entry
+    # ==========================================
+
+    VendorLedger.objects.create(
+
+        vendor=vendor,
+
+        transaction_date=transaction_date,
+
+        transaction_type=transaction_type,
+
+        amount=amount,
+
+        mode=mode,
+
+        against_invoice=against_invoice,
+
+        reference=reference,
+
+        remark=remark,
+
+        attachment=attachment,
+
+        dr=dr,
+
+        cr=cr,
+
+    )
+
+
+    # ==========================================
+    # Recalculate running balances
+    # ==========================================
+
+    VendorLedgerService.recalculate(
+        vendor
+    )
+
+
+    # ==========================================
+    # Success message
+    # ==========================================
+
+    if transaction_type == "payment":
+
+        messages.success(
+            request,
+            f"Payment of ₹{amount:,.2f} recorded successfully."
+        )
+
+    else:
+
+        messages.success(
+            request,
+            f"Purchase return of ₹{amount:,.2f} recorded successfully."
+        )
+
+
+    return redirect(
+        "vendor_ledger",
+        vendor_id=vendor.id
+    )
 
 def purchases_invoices(request):
     invoices = PurchaseInvoice.objects.select_related("vendor").prefetch_related("items")
@@ -524,19 +1389,95 @@ def purchases_invoices(request):
             invoice.total_amount = sum(line_totals, Decimal("0"))
             invoice.grand_total = invoice.total_amount
             invoice.save(update_fields=["total_amount", "grand_total"])
+
+            VendorLedger.objects.create(
+                vendor=vendor,
+                transaction_date=invoice.invoice_date,
+                transaction_type="purchase",
+                amount=invoice.grand_total,
+                against_invoice=invoice,
+                remark=f"Purchase Invoice {invoice.invoice_number}",
+                cr=invoice.grand_total,
+                dr=Decimal("0.00"),
+            )
+
+            VendorLedgerService.recalculate(vendor)
+
             messages.success(request, "Purchase invoice created successfully.")
             return redirect("purchases_invoices")
 
     products = Product.objects.all().order_by("category", "item_code")
     product_categories = sorted({product.category for product in products if product.category})
+    products_json = []
+    
+    for product in products:
+
+        try:
+            available_stock = (
+                product.stock.quantity_available
+            )
+        except InventoryStock.DoesNotExist:
+            available_stock = 0
+
+        products_json.append({
+            "id": product.id,
+            "category": product.category,
+            "item_code": product.item_code,
+            "item_name": product.item_name,
+            "specification": product.specification,
+            "selling_price": float(
+                product.selling_price
+            ),
+            "available_stock": available_stock,
+        })
     context = {
         "invoices": invoices,
         "vendors": Vendor.objects.all().order_by("name"),
         "products": products,
+        "products_json": products_json,
         "product_categories": product_categories,
     }
     return render(request, "purchase_invoices.html", context)
 
+@login_required
+def vendor_ledger(request, vendor_id):
+
+    vendor = get_object_or_404(
+        Vendor,
+        pk=vendor_id
+    )
+
+    transactions = VendorLedger.objects.filter(
+        vendor=vendor
+    ).select_related(
+        "against_invoice"
+    ).order_by(
+        "-transaction_date",
+        "-id"
+    )[:20]
+
+    latest_transaction = VendorLedger.objects.filter(
+        vendor=vendor
+    ).order_by(
+        "-transaction_date",
+        "-id"
+    ).first()
+
+    closing_balance = (
+        latest_transaction.closing_balance
+        if latest_transaction
+        else Decimal("0.00")
+    )
+
+    return render(
+        request,
+        "vendor_ledger.html",
+        {
+            "vendor": vendor,
+            "transactions": transactions,
+            "closing_balance": closing_balance,
+        }
+    )
 
 def purchase_invoice_pdf(request, invoice_id):
     invoice = PurchaseInvoice.objects.filter(pk=invoice_id).first()
@@ -548,6 +1489,8 @@ def purchase_invoice_pdf(request, invoice_id):
         raise Http404("PDF not found")
 
     return FileResponse(open(file_path, "rb"), content_type="application/pdf")
+
+
 
 
 def login_view(request):
@@ -629,12 +1572,48 @@ def logout_view(request):
 
 @login_required
 def home(request):
-    if not request.user.is_authenticated:
-        return redirect("login")
+
     if not request.user.is_superuser:
         return redirect("login")
-    return render(request, "index.html")
 
+    product_count = Product.objects.count()
+    customer_count = Customer.objects.count()
+    vendor_count = Vendor.objects.count()
+
+    total_stock_value = sum(
+        stock.total_value
+        for stock in InventoryStock.objects.all()
+    )
+
+    # Last 5 purchases
+    recent_purchases = PurchaseInvoice.objects.select_related(
+        "vendor"
+    ).order_by("-invoice_date", "-id")[:5]
+
+    # Last 5 sales
+    recent_sales = SalesInvoice.objects.select_related(
+        "customer"
+    ).order_by("-invoice_date", "-id")[:5]
+
+    # Top 10 low stock items
+    low_stock_items = InventoryStock.objects.select_related(
+        "product"
+    ).filter(
+        quantity_on_hand__lte=F("product__reorder_level")
+    ).order_by(
+        "quantity_on_hand"
+    )[:10]
+
+    return render(request, "index.html", {
+        "product_count": product_count,
+        "customer_count": customer_count,
+        "vendor_count": vendor_count,
+        "total_stock_value": total_stock_value,
+
+        "recent_purchases": recent_purchases,
+        "recent_sales": recent_sales,
+        "low_stock_items": low_stock_items,
+    })
 
 
 def inventory_products(request):
