@@ -1469,6 +1469,20 @@ def vendor_ledger(request, vendor_id):
         else Decimal("0.00")
     )
 
+    # ==========================================
+    # Process closing balance for display
+    # ==========================================
+
+    if closing_balance < 0:
+
+        display_balance = abs(closing_balance)
+        balance_type = "Dr"
+
+    else:
+
+        display_balance = closing_balance
+        balance_type = "Cr"
+
     return render(
         request,
         "vendor_ledger.html",
@@ -1476,6 +1490,8 @@ def vendor_ledger(request, vendor_id):
             "vendor": vendor,
             "transactions": transactions,
             "closing_balance": closing_balance,
+            "display_balance": display_balance,
+            "balance_type": balance_type,
         }
     )
 

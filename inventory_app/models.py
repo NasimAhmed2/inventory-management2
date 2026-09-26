@@ -171,6 +171,16 @@ class VendorLedger(models.Model):
 
     created_at = models.DateTimeField(auto_now_add=True)
 
+    @property
+    def display_balance(self):
+        return abs(self.closing_balance)
+
+
+    @property
+    def balance_type(self):
+            
+        return "Dr" if self.closing_balance < 0 else "Cr"
+
     class Meta:
         db_table = "vendor_ledgers"
         ordering = ["-transaction_date", "-id"]

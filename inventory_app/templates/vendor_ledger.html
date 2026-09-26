@@ -26,7 +26,7 @@
             </div>
 
             <div class="fs-3 fw-bold">
-                ₹{{ closing_balance|floatformat:2 }}
+                ₹{{ display_balance|floatformat:2 }} {{ balance_type }}
             </div>
         </div>
 
@@ -142,7 +142,8 @@
                             </td>
 
                             <td class="text-end fw-semibold">
-                                ₹{{ entry.closing_balance|floatformat:2 }}
+                                ₹{{ entry.display_balance|floatformat:2 }}
+                                {{ entry.balance_type }}
                             </td>
 
                         </tr>
