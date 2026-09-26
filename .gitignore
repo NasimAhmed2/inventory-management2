@@ -11,5 +11,8 @@ inventory_app/migrations/*
 # SQLite database
 db.sqlite3
 
+# .env
+.env
+
 # Project reference/documentation
 ERP_PROJECT_REFERENCE.md
