@@ -44,17 +44,17 @@ from openpyxl import load_workbook, Workbook
 from openpyxl.styles import Font, Alignment
 
 from .forms import ProductForm
-from .models import Product_Categories
+# from .models import Product_Categories
 
 
 User = get_user_model()
 
 CATEGORY_HSN = {}
 
-for entry in Product_Categories.objects.all():
-    CATEGORY_HSN.setdefault(entry.category_name, []).append(
-        (entry.hsn_code, entry.description)
-    )
+# for entry in Product_Categories.objects.all():
+#     CATEGORY_HSN.setdefault(entry.category_name, []).append(
+#         (entry.hsn_code, entry.description)
+#     )
 
 def generate_customer_code():
 

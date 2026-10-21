@@ -1,13 +1,13 @@
 from django import forms
 from .models import Product
-from .models import Product_Categories
+# from .models import Product_Categories
 
 CATEGORY_HSN = {}
 
-for entry in Product_Categories.objects.all():
-    CATEGORY_HSN.setdefault(entry.category_name, []).append(
-        (entry.hsn_code, entry.description)
-    )
+# for entry in Product_Categories.objects.all():
+#     CATEGORY_HSN.setdefault(entry.category_name, []).append(
+#         (entry.hsn_code, entry.description)
+#     )
 
 
 class ProductForm(forms.ModelForm):
