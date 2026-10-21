@@ -1,6 +1,13 @@
 from django import forms
 from .models import Product
-from .constants import CATEGORY_HSN
+from .models import Product_Categories
+
+CATEGORY_HSN = {}
+
+for entry in Product_Categories.objects.all():
+    CATEGORY_HSN.setdefault(entry.category_name, []).append(
+        (entry.hsn_code, entry.description)
+    )
 
 
 class ProductForm(forms.ModelForm):
@@ -14,6 +21,29 @@ class ProductForm(forms.ModelForm):
         widget=forms.Select(attrs={"class": "form-select"})
     )
 
+    opening_qty = forms.IntegerField(
+        required=False,
+        min_value=0,
+        initial=0,
+        widget=forms.NumberInput(attrs={
+            "class": "form-control",
+            "min": 0,
+        })
+    )
+
+    purchase_price = forms.DecimalField(
+        required=False,
+        min_value=0,
+        decimal_places=2,
+        max_digits=15,
+        initial=0,
+        widget=forms.NumberInput(attrs={
+            "class": "form-control",
+            "min": 0,
+            "step": "0.01",
+        })
+    )
+
     class Meta:
         model = Product
         fields = [
@@ -21,9 +51,14 @@ class ProductForm(forms.ModelForm):
             "item_name",
             "category",
             "hs_code",
+            "brand",
+            "model_number",
             "specification",
             "unit_of_measure",
             "reorder_level",
+            "opening_qty",
+            "purchase_price",
+            "stock_tracking",
         ]
 
         widgets = {

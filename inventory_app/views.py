@@ -16,27 +16,20 @@ from .models import Product, InventoryStock, InventoryMovement
 from django.utils import timezone
 from django.db import transaction
 from django.db.models import F
+import xlrd
 from .models import (
-    Product, 
-    PurchaseInvoice, 
-    PurchaseLineItem, 
-    UserProfile, 
-    Vendor, 
-    ServiceReport,
-    Customer,
-    Ticket,
-    SalesInvoice,
-    VendorLedger,
-    
+    Product, PurchaseInvoice, PurchaseLineItem, UserProfile, Vendor, 
+    ServiceReport, Customer, Ticket, SalesInvoice, VendorLedger,  
+    Product_Categories,  
 )
+
 from .services import (
-    InventoryService, 
-    CustomerService, 
-    TicketService, 
-    ServiceReportService,
-    SaleService,
-    VendorLedgerService,
-    VendorLedgerEmailService,
+    InventoryService, CustomerService, TicketService, ServiceReportService,
+    SaleService, VendorLedgerService, VendorLedgerEmailService,
+)
+
+from .helpers import (
+    generate_item_code, generate_vendor_code, generate_invoice_number
 )
 
 
@@ -47,16 +40,21 @@ from django.http import JsonResponse
 from django.contrib.auth.decorators import login_required
 from django.http import HttpResponse
 
-from openpyxl import Workbook
+from openpyxl import load_workbook, Workbook
 from openpyxl.styles import Font, Alignment
 
 from .forms import ProductForm
-from .constants import CATEGORY_HSN
+from .models import Product_Categories
 
 
 User = get_user_model()
 
+CATEGORY_HSN = {}
 
+for entry in Product_Categories.objects.all():
+    CATEGORY_HSN.setdefault(entry.category_name, []).append(
+        (entry.hsn_code, entry.description)
+    )
 
 def generate_customer_code():
 
@@ -83,50 +81,24 @@ def placeholder_view(request, page_title="Coming Soon"):
     return render(request, "placeholder.html", {"page_title": page_title})
 
 
-def generate_vendor_code():
-    last_vendor = Vendor.objects.order_by('-id').first()
-    if not last_vendor or not last_vendor.vendor_code:
-        return "MI001"
-
-    match = re.search(r'(\d+)$', last_vendor.vendor_code.lower())
-    if match:
-        number = int(match.group(1)) + 1
-        return f"MI{number:03d}"
-    return "MI001"
-
-
-def generate_invoice_number(invoice_date):
-    prefix = invoice_date.strftime("PI%Y%m%d")
-    today_invoices = PurchaseInvoice.objects.filter(invoice_number__startswith=prefix).count()
-    return f"{prefix}{today_invoices + 1:03d}"
-
-
-
 
 def sales_customers(request):
 
-    customers = Customer.objects.all().order_by("customer_code")
+    customers = Customer.objects.all().order_by("name", "id")
 
     search = request.GET.get("search", "").strip()
 
     if search:
-
         customers = customers.filter(
-
             Q(customer_code__icontains=search) |
-
             Q(name__icontains=search) |
-
             Q(mobile__icontains=search) |
-
             Q(email__icontains=search)
-
         )
 
     if request.method == "POST":
 
         try:
-
             with transaction.atomic():
 
                 customer_id = request.POST.get("customer_id")
@@ -145,37 +117,353 @@ def sales_customers(request):
 
                 else:
 
-                    CustomerService.create_customer(
-                        request=request,
-                    )
+                    customer_code = request.POST.get(
+                        "customer_code", ""
+                    ).strip()
 
-                    messages.success(
-                        request,
-                        "Customer created successfully."
-                    )
+                    name = request.POST.get(
+                        "name", ""
+                    ).strip()
+
+                    mobile = request.POST.get(
+                        "mobile", ""
+                    ).strip()
+
+                    existing_customer = Customer.objects.filter(
+                        customer_code__iexact=customer_code,
+                        name__iexact=name,
+                        mobile=mobile,
+                    ).first()
+
+                    if existing_customer:
+
+                        messages.warning(
+                            request,
+                            (
+                                f"Customer already exists! "
+                                f"Code: {existing_customer.customer_code}, "
+                                f"Name: {existing_customer.name}, "
+                                f"Mobile: {existing_customer.mobile}."
+                            )
+                        )
+
+                    else:
+
+                        CustomerService.create_customer(
+                            request=request,
+                        )
+
+                        messages.success(
+                            request,
+                            "Customer created successfully."
+                        )
 
         except Exception as e:
 
-            messages.error(
-                request,
-                str(e)
-            )
+            messages.error(request, str(e))
 
         return redirect("sales_customers")
 
+    # Pagination: 20 customers per page
+    paginator = Paginator(customers, 20)
+
+    page_number = request.GET.get("page")
+    customers_page = paginator.get_page(page_number)
+
     context = {
-
-        "customers": customers,
-
+        "customers": customers_page,
         "search": search,
-
     }
 
-    return render(
-        request,
-        "customers.html",
-        context,
-    )
+    return render(request, "customers.html", context)
+
+
+@login_required
+def sales_customers_excel(request):
+
+    if request.method != "POST":
+        return redirect("sales_customers")
+
+    excel_file = request.FILES.get("excel_file")
+
+    if not excel_file:
+        messages.error(request, "Please select an Excel file.")
+        return redirect("sales_customers")
+
+    extension = os.path.splitext(excel_file.name)[1].lower()
+
+    if extension not in [".xlsx", ".xls"]:
+        messages.error(
+            request,
+            "Invalid file format. Please upload an .xlsx or .xls file."
+        )
+        return redirect("sales_customers")
+
+    if excel_file.size > 5 * 1024 * 1024:
+        messages.error(request, "File size must not exceed 5 MB.")
+        return redirect("sales_customers")
+
+    workbook = None
+
+    try:
+        # Open the first worksheet
+        if extension == ".xlsx":
+            workbook = load_workbook(
+                excel_file,
+                read_only=True,
+                data_only=True
+            )
+            worksheet = workbook.active
+            rows = worksheet.iter_rows(values_only=True)
+
+        else:
+            workbook = xlrd.open_workbook(
+                file_contents=excel_file.read()
+            )
+            worksheet = workbook.sheet_by_index(0)
+
+            rows = (
+                worksheet.row_values(i)
+                for i in range(worksheet.nrows)
+            )
+
+        headers = next(rows, None)
+
+        if not headers:
+            messages.error(request, "The Excel file is empty.")
+            return redirect("sales_customers")
+
+        # Normalize headers
+        normalized_headers = [
+            str(header).strip().lower() if header is not None else ""
+            for header in headers
+        ]
+
+        required_columns = [
+            "type",
+            "name",
+            "mobile",
+            "email",
+            "payment",
+            "creditlimit",
+        ]
+
+        missing_columns = [
+            column
+            for column in required_columns
+            if column not in normalized_headers
+        ]
+
+        if missing_columns:
+            messages.error(
+                request,
+                "Missing Excel columns: "
+                + ", ".join(missing_columns)
+                + ". Required columns: Type, Name, Mobile, Email, "
+                  "Payment, CreditLimit."
+            )
+            return redirect("sales_customers")
+
+        column_index = {
+            name: normalized_headers.index(name)
+            for name in required_columns
+        }
+
+        def cell_value(row, column_name):
+            index = column_index[column_name]
+
+            if index >= len(row) or row[index] is None:
+                return ""
+
+            value = row[index]
+
+            # Avoid converting whole numbers to strings ending in .0
+            if isinstance(value, float) and value.is_integer():
+                value = int(value)
+
+            return str(value).strip()
+
+        imported = 0
+        skipped = 0
+        errors = []
+
+        valid_customer_types = {
+            "consumer",
+            "retailer",
+            "wholesaler",
+        }
+
+        valid_payment_types = {
+            "cash",
+            "credit",
+        }
+
+        for row_number, row in enumerate(rows, start=2):
+
+            # Skip completely empty rows
+            if not row or all(
+                value is None or str(value).strip() == ""
+                for value in row
+            ):
+                continue
+
+            customer_type = cell_value(row, "type").lower()
+            name = cell_value(row, "name")
+            mobile = cell_value(row, "mobile")
+            email = cell_value(row, "email")
+            payment_type = cell_value(row, "payment").lower()
+            credit_limit_text = cell_value(row, "creditlimit")
+
+            if not customer_type or not name or not mobile:
+                skipped += 1
+                errors.append(
+                    f"Row {row_number}: Type, Name and Mobile are required."
+                )
+                continue
+
+            if customer_type not in valid_customer_types:
+                skipped += 1
+                errors.append(
+                    f"Row {row_number}: Invalid customer type "
+                    f"'{customer_type}'."
+                )
+                continue
+
+            if len(name) > 255 or len(mobile) > 20:
+                skipped += 1
+                errors.append(
+                    f"Row {row_number}: Name or Mobile exceeds "
+                    "the allowed length."
+                )
+                continue
+
+            if email:
+                try:
+                    validate_email(email)
+                except ValidationError:
+                    skipped += 1
+                    errors.append(
+                        f"Row {row_number}: Invalid email '{email}'."
+                    )
+                    continue
+
+            if not payment_type:
+                payment_type = "cash"
+
+            if payment_type not in valid_payment_types:
+                skipped += 1
+                errors.append(
+                    f"Row {row_number}: Payment must be cash or credit."
+                )
+                continue
+
+            try:
+                credit_limit = (
+                    Decimal(credit_limit_text)
+                    if credit_limit_text
+                    else Decimal("0")
+                )
+
+                if (
+                    not credit_limit.is_finite()
+                    or credit_limit < 0
+                    or credit_limit.as_tuple().exponent < -2
+                    or credit_limit >= Decimal("10000000000000")
+                ):
+                    raise InvalidOperation
+
+            except (InvalidOperation, ValueError):
+                skipped += 1
+                errors.append(
+                    f"Row {row_number}: CreditLimit must be a "
+                    "non-negative amount with at most two decimal places."
+                )
+                continue
+
+            try:
+                with transaction.atomic():
+
+                    # Use the existing customer-code generator
+                    customer_code = (
+                        CustomerService.generate_customer_code()
+                    )
+
+                    # Protect against a code collision
+                    if Customer.objects.filter(
+                        customer_code=customer_code
+                    ).exists():
+                        raise ValueError(
+                            f"Generated customer code {customer_code} "
+                            "already exists. Please check the code generator."
+                        )
+
+                    # Avoid importing the same customer twice
+                    existing_customer = Customer.objects.filter(
+                        name__iexact=name,
+                        mobile=mobile,
+                    ).first()
+
+                    if existing_customer:
+                        skipped += 1
+                        errors.append(
+                            f"Row {row_number}: Customer already exists "
+                            f"({existing_customer.customer_code} - "
+                            f"{existing_customer.name})."
+                        )
+                        continue
+
+                    Customer.objects.create(
+                        customer_code=customer_code,
+                        customer_type=customer_type,
+                        name=name,
+                        mobile=mobile,
+                        email=email,
+                        payment_type=payment_type,
+                        credit_limit=credit_limit,
+                    )
+
+                imported += 1
+
+            except Exception as e:
+                skipped += 1
+                errors.append(
+                    f"Row {row_number}: Could not import {name}. {str(e)}"
+                )
+
+        if imported:
+            messages.success(
+                request,
+                f"Import completed. {imported} customer(s) added; "
+                f"{skipped} row(s) skipped."
+            )
+        else:
+            messages.warning(
+                request,
+                f"No customers were imported. {skipped} row(s) skipped."
+            )
+
+        # Display up to five row-level errors
+        for error in errors[:5]:
+            messages.warning(request, error)
+
+        if len(errors) > 5:
+            messages.warning(
+                request,
+                f"{len(errors) - 5} additional row errors were not displayed."
+            )
+
+    except Exception:
+        messages.error(
+            request,
+            "Unable to read the Excel file. Please check that it is a "
+            "valid Excel file and try again."
+        )
+
+    finally:
+        if workbook is not None and extension == ".xlsx":
+            workbook.close()
+
+    return redirect("sales_customers")
 
 
 def customer_delete(request, pk):
@@ -1631,6 +1919,309 @@ def home(request):
         "low_stock_items": low_stock_items,
     })
 
+def inventory_products_categories(request):
+
+    if request.method == "POST":
+
+        action = request.POST.get("action")
+
+        try:
+            with transaction.atomic():
+
+                if action == "add_category":
+
+                    category_name = request.POST.get(
+                        "category_name", ""
+                    ).strip()
+
+                    hsn_code = request.POST.get(
+                        "hsn_code", ""
+                    ).strip()
+
+                    description = request.POST.get(
+                        "description", ""
+                    ).strip()
+
+                    if not category_name:
+                        raise ValueError("Category name is required.")
+
+                    if Product_Categories.objects.filter(
+                        category_name__iexact=category_name
+                    ).exists():
+                        raise ValueError("This category already exists.")
+
+                    Product_Categories.objects.create(
+                        category_name=category_name,
+                        hsn_code=hsn_code,
+                        description=description,
+                    )
+
+                    messages.success(
+                        request, "Category added successfully."
+                    )
+
+                elif action == "add_hsn":
+
+                    category_name = request.POST.get(
+                        "category_name", ""
+                    ).strip()
+
+                    hsn_code = request.POST.get(
+                        "hsn_code", ""
+                    ).strip()
+
+                    description = request.POST.get(
+                        "description", ""
+                    ).strip()
+
+                    if not hsn_code:
+                        raise ValueError("HSN code is required.")
+
+                    if not Product_Categories.objects.filter(
+                        category_name=category_name
+                    ).exists():
+                        raise ValueError("Please select a valid category.")
+
+                    Product_Categories.objects.create(
+                        category_name=category_name,
+                        hsn_code=hsn_code,
+                        description=description,
+                    )
+
+                    messages.success(
+                        request, "HSN code added successfully."
+                    )
+
+                elif action == "edit_hsn":
+
+                    entry = get_object_or_404(
+                        Product_Categories,
+                        pk=request.POST.get("entry_id"),
+                    )
+
+                    category_name = request.POST.get(
+                        "category_name", ""
+                    ).strip()
+
+                    hsn_code = request.POST.get(
+                        "hsn_code", ""
+                    ).strip()
+
+                    description = request.POST.get(
+                        "description", ""
+                    ).strip()
+
+                    if not category_name or not hsn_code:
+                        raise ValueError(
+                            "Category name and HSN code are required."
+                        )
+
+                    # If this is a new category name, create the category's
+                    # first row; otherwise use the selected existing category.
+                    entry.category_name = category_name
+                    entry.hsn_code = hsn_code
+                    entry.description = description
+                    entry.save()
+
+                    messages.success(
+                        request, "HSN entry updated successfully."
+                    )
+
+                else:
+                    raise ValueError("Invalid action.")
+
+        except Exception as e:
+            messages.error(request, str(e))
+
+        return redirect("inventory_products_categories")
+
+    entries = Product_Categories.objects.all().order_by(
+        "category_name", "hsn_code"
+    )
+
+    categories = sorted(
+        set(entries.values_list("category_name", flat=True)),
+        key=str.casefold,
+    )
+
+    context = {
+        "page_title": "Product Categories & HSN Codes",
+        "entries": entries,
+        "categories": categories,
+    }
+
+    return render(
+        request,
+        "product_categories.html",
+        context,
+    )
+
+
+@login_required
+def inventory_products_categories_excel(request):
+
+    if request.method != "POST":
+        return redirect("inventory_products_categories")
+
+    excel_file = request.FILES.get("excel_file")
+
+    if not excel_file:
+        messages.error(request, "Please select an Excel file.")
+        return redirect("inventory_products_categories")
+
+    extension = os.path.splitext(excel_file.name)[1].lower()
+
+    if extension not in [".xlsx", ".xls"]:
+        messages.error(
+            request,
+            "Invalid file format. Please upload an .xlsx or .xls file."
+        )
+        return redirect("inventory_products_categories")
+
+    # Limit upload size to 5 MB
+    if excel_file.size > 5 * 1024 * 1024:
+        messages.error(request, "File size must not exceed 5 MB.")
+        return redirect("inventory_products_categories")
+
+    try:
+        # Read Excel data
+        if extension == ".xlsx":
+            workbook = load_workbook(
+                excel_file,
+                read_only=True,
+                data_only=True
+            )
+            worksheet = workbook.active
+            rows = worksheet.iter_rows(values_only=True)
+
+        else:
+            workbook = xlrd.open_workbook(file_contents=excel_file.read())
+            worksheet = workbook.sheet_by_index(0)
+            rows = (
+                worksheet.row_values(row_index)
+                for row_index in range(worksheet.nrows)
+            )
+
+        # Read the first row as column headers
+        headers = next(rows, None)
+
+        if not headers:
+            messages.error(request, "The Excel file is empty.")
+            return redirect("inventory_products_categories")
+
+        # Normalize headers: Category, CATEGORY and category are equivalent
+        normalized_headers = [
+            str(header).strip().lower() if header is not None else ""
+            for header in headers
+        ]
+
+        required_columns = ["category", "description", "hsn"]
+
+        missing_columns = [
+            column
+            for column in required_columns
+            if column not in normalized_headers
+        ]
+
+        if missing_columns:
+            messages.error(
+                request,
+                "Missing required columns: "
+                + ", ".join(missing_columns)
+                + ". Required columns are: category, description, hsn."
+            )
+            return redirect("inventory_products_categories")
+
+        # Find each column's position
+        category_index = normalized_headers.index("category")
+        description_index = normalized_headers.index("description")
+        hsn_index = normalized_headers.index("hsn")
+
+        imported = 0
+        skipped = 0
+
+        with transaction.atomic():
+
+            for row_number, row in enumerate(rows, start=2):
+
+                # Ignore completely empty rows
+                if not row or all(
+                    value is None or str(value).strip() == ""
+                    for value in row
+                ):
+                    continue
+
+                # Safely read values from the row
+                category_name = (
+                    str(row[category_index]).strip()
+                    if category_index < len(row)
+                    and row[category_index] is not None
+                    else ""
+                )
+
+                description = (
+                    str(row[description_index]).strip()
+                    if description_index < len(row)
+                    and row[description_index] is not None
+                    else ""
+                )
+
+                hsn_value = (
+                    row[hsn_index]
+                    if hsn_index < len(row)
+                    else ""
+                )
+
+                # Keep numeric HSN values as integer strings where possible.
+                # Excel cells formatted as text retain leading zeros.
+                if isinstance(hsn_value, float) and hsn_value.is_integer():
+                    hsn_code = str(int(hsn_value))
+                else:
+                    hsn_code = (
+                        str(hsn_value).strip()
+                        if hsn_value is not None
+                        else ""
+                    )
+
+                if not category_name or not hsn_code:
+                    skipped += 1
+                    continue
+
+                # Prevent duplicate category + HSN combinations.
+                # Existing records are left unchanged.
+                _, created = Product_Categories.objects.get_or_create(
+                    category_name=category_name,
+                    hsn_code=hsn_code,
+                    defaults={
+                        "description": description,
+                    }
+                )
+
+                if created:
+                    imported += 1
+                else:
+                    skipped += 1
+
+        messages.success(
+            request,
+            f"Import completed. Added: {imported}. "
+            f"Skipped: {skipped} (empty required fields or existing entries)."
+        )
+
+    except Exception as e:
+        messages.error(
+            request,
+            f"Could not process the Excel file. "
+            f"Please check the file and try again. Details: {e}"
+        )
+
+    finally:
+        if extension == ".xlsx" and "workbook" in locals():
+            workbook.close()
+
+    return redirect("inventory_products_categories")
+
+
 
 def inventory_products(request):
     """
@@ -1645,21 +2236,36 @@ def inventory_products(request):
 
         if form.is_valid():
 
-            product = form.save()
+            try:
+                with transaction.atomic():
 
-            InventoryStock.objects.get_or_create(
-                product=product
-            )
+                    opening_qty = form.cleaned_data.get("opening_qty") or 0
+                    purchase_price = form.cleaned_data.get("purchase_price") or 0
+                    
+                    product = form.save()
 
-            messages.success(
-                request,
-                "Product added successfully."
-            )
+                    product.item_code = generate_item_code(product.category)
+                    product.save()
 
-            return redirect("inventory_products")
+                    stock, created = InventoryStock.objects.get_or_create(
+                        product=product
+                    )
+
+                    stock.quantity_on_hand = opening_qty
+                    stock.last_cost = purchase_price
+                    stock.save()
+
+                messages.success(
+                    request,
+                    f"Product added successfully. Item Code: {product.item_code}"
+                )
+
+                return redirect("inventory_products")
+
+            except Exception as e:
+                messages.error(request, str(e))
 
         else:
-
             messages.error(
                 request,
                 "Please correct the highlighted errors."
@@ -1680,11 +2286,17 @@ def inventory_products(request):
             | Q(hs_code__icontains=search)
         )
 
+    paginator = Paginator(products, 20)
+
+    products_page = paginator.get_page(
+        request.GET.get("page")
+    )
+
     context = {
 
         "page_title": "Products",
 
-        "products": products,
+        "products": products_page,
 
         "search": search,
 
@@ -1699,6 +2311,227 @@ def inventory_products(request):
         "products.html",
         context,
     )
+
+
+@login_required
+def inventory_products_excel(request):
+
+    if request.method != "POST":
+        return redirect("inventory_products")
+
+    excel_file = request.FILES.get("excel_file")
+
+    if not excel_file:
+        messages.error(request, "Please select an Excel file.")
+        return redirect("inventory_products")
+
+    extension = os.path.splitext(excel_file.name)[1].lower()
+
+    if extension not in [".xlsx", ".xls"]:
+        messages.error(
+            request,
+            "Invalid file format. Please upload an .xlsx or .xls file."
+        )
+        return redirect("inventory_products")
+
+    if excel_file.size > 5 * 1024 * 1024:
+        messages.error(request, "File size must not exceed 5 MB.")
+        return redirect("inventory_products")
+
+    workbook = None
+
+    try:
+        # Open the first worksheet
+        if extension == ".xlsx":
+            workbook = load_workbook(
+                excel_file,
+                read_only=True,
+                data_only=True
+            )
+            worksheet = workbook.active
+            rows = worksheet.iter_rows(values_only=True)
+
+        else:
+            workbook = xlrd.open_workbook(
+                file_contents=excel_file.read()
+            )
+            worksheet = workbook.sheet_by_index(0)
+
+            rows = (
+                worksheet.row_values(i)
+                for i in range(worksheet.nrows)
+            )
+
+        headers = next(rows, None)
+
+        if not headers:
+            messages.error(request, "The Excel file is empty.")
+            return redirect("inventory_products")
+
+        # Normalize headers
+        normalized_headers = [
+            str(header).strip().lower() if header is not None else ""
+            for header in headers
+        ]
+
+        required_columns = [
+            "item name",
+            "category",
+            "hsn",
+            "specification",
+            "unit",
+            "reorder",
+        ]
+
+        missing_columns = [
+            column
+            for column in required_columns
+            if column not in normalized_headers
+        ]
+
+        if missing_columns:
+            messages.error(
+                request,
+                "Missing Excel columns: "
+                + ", ".join(missing_columns)
+                + ". Please use all six required column headers."
+            )
+            return redirect("inventory_products")
+
+        # Column positions
+        column_index = {
+            name: normalized_headers.index(name)
+            for name in required_columns
+        }
+
+        def cell_value(row, column_name):
+            index = column_index[column_name]
+
+            if index >= len(row) or row[index] is None:
+                return ""
+
+            value = row[index]
+
+            # Avoid values like 5.0 for whole-number Excel cells
+            if isinstance(value, float) and value.is_integer():
+                value = int(value)
+
+            return str(value).strip()
+
+        imported = 0
+        skipped = 0
+        errors = []
+
+        with transaction.atomic():
+
+            for row_number, row in enumerate(rows, start=2):
+
+                # Ignore completely empty rows
+                if not row or all(
+                    value is None or str(value).strip() == ""
+                    for value in row
+                ):
+                    continue
+
+                item_name = cell_value(row, "item name")
+                category = cell_value(row, "category")
+                hsn = cell_value(row, "hsn")
+                specification = cell_value(row, "specification")
+                unit = cell_value(row, "unit")
+                reorder_text = cell_value(row, "reorder")
+
+                # Required values
+                if not item_name or not category:
+                    skipped += 1
+                    errors.append(
+                        f"Row {row_number}: Item Name and Category are required."
+                    )
+                    continue
+
+                # Reorder level validation
+                if reorder_text == "":
+                    reorder_level = 10
+                else:
+                    try:
+                        reorder_level = int(reorder_text)
+
+                        if reorder_level < 0:
+                            raise ValueError
+
+                    except (ValueError, TypeError):
+                        skipped += 1
+                        errors.append(
+                            f"Row {row_number}: Reorder must be a "
+                            "non-negative whole number."
+                        )
+                        continue
+
+                try:
+                    with transaction.atomic():
+
+                        # Generate the item code using your existing function
+                        item_code = generate_item_code(category)
+
+                        product = Product.objects.create(
+                            item_code=item_code,
+                            item_name=item_name,
+                            category=category,
+                            hs_code=hsn,
+                            specification=specification,
+                            unit_of_measure=unit or "pcs",
+                            reorder_level=reorder_level,
+                        )
+
+                        # Initialize stock at zero
+                        InventoryStock.objects.get_or_create(
+                            product=product
+                        )
+
+                    imported += 1
+
+                except Exception as e:
+                    skipped += 1
+                    errors.append(
+                        f"Row {row_number}: Could not import "
+                        f"{item_name}. {str(e)}"
+                    )
+
+        if imported:
+            messages.success(
+                request,
+                f"Import completed. {imported} product(s) added; "
+                f"{skipped} row(s) skipped."
+            )
+        else:
+            messages.warning(
+                request,
+                f"No products were imported. {skipped} row(s) skipped."
+            )
+
+        # Show a limited number of row errors
+        for error in errors[:5]:
+            messages.warning(request, error)
+
+        if len(errors) > 5:
+            messages.warning(
+                request,
+                f"{len(errors) - 5} additional row errors were not displayed."
+            )
+
+    except Exception:
+        messages.error(
+            request,
+            "Unable to read the Excel file. Please check that it is a "
+            "valid Excel file and try again."
+        )
+
+    finally:
+        if workbook is not None and extension == ".xlsx":
+            workbook.close()
+
+    return redirect("inventory_products")
+
+
 
 
 @require_POST

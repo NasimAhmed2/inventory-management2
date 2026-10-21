@@ -39,8 +39,6 @@ CATEGORY_HSN = {
     "Cables & Accessories": [
         ("854442", "HDMI Cable"),
         ("85444290", "USB Cable"),
-        ("854449", "LAN Cable"),
-        ("853669", "Connectors"),
     ],
 
     "Office Equipment": [

@@ -7,7 +7,10 @@ urlpatterns = [
     path("signup/", views.signup_view, name="signup"),
     path("logout/", views.logout_view, name="logout"),
     path("home/", views.home, name="home"),
+    path("inventory/products/categories/", views.inventory_products_categories, name="inventory_products_categories"),
+    path("inventory/products/categories-excel/", views.inventory_products_categories_excel, name="inventory_products_categories_excel"),
     path("inventory/products/", views.inventory_products, name="inventory_products"),
+    path("inventory/products-excel/", views.inventory_products_excel, name="inventory_products_excel"),
     path(
         "inventory/products/update/<int:pk>/",
         views.product_update,
@@ -34,6 +37,7 @@ urlpatterns = [
     # Customers and Sales
     # ==========================================================
     path("sales/customers/", views.sales_customers, name="sales_customers"),
+    path("sales/customers-excel/", views.sales_customers_excel, name="sales_customers_excel"),
     path("customers/delete/<int:pk>/", views.customer_delete, name="customer_delete"),
 
     # path("sales/invoices/", views.placeholder_view, {"page_title": "Sales Invoices"}, name="sales_invoices"),

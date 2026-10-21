@@ -4,6 +4,8 @@ from decimal import Decimal
 from django.utils import timezone
 from django.contrib.auth.models import User
 from django.core.validators import MinValueValidator
+from django.core.validators import MinLengthValidator
+
 
 
 class UserProfile(models.Model):
@@ -188,6 +190,19 @@ class VendorLedger(models.Model):
     def __str__(self):
         return f"{self.vendor.name} - {self.transaction_type} - {self.amount}"
 
+class Product_Categories(models.Model):
+    category_name = models.CharField(max_length=100)
+    hsn_code = models.CharField(max_length=50, blank=True, unique=True)
+    description = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["category_name", "hsn_code"]
+        db_table = "inventory_product_categories"
+
+    def __str__(self):
+        return f"{self.category_name} - {self.hsn_code}"
 
 class Product(models.Model):
     item_code = models.CharField(max_length=100, unique=True)
@@ -198,8 +213,12 @@ class Product(models.Model):
     selling_price = models.DecimalField(max_digits=12, decimal_places=2,default=0)
     reorder_level = models.IntegerField(default=10)
     category = models.CharField(max_length=100)
+    brand = models.CharField(max_length=100,blank=True)
+    model_number = models.CharField(max_length=100,blank=True)
+    stock_tracking = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+    
 
     class Meta:
         ordering = ['item_code']
@@ -536,8 +555,14 @@ class Customer(models.Model):
         ('cash', 'Cash'),
         ('credit', 'Credit'),
     ]
+    CUSTOMER_TYPE_CHOICES = [
+        ('consumer', 'Consumer'),
+        ('retailer', 'Retailer'),
+        ('wholesaler', 'Wholesaler'),
+    ]
 
     customer_code = models.CharField(max_length=50, unique=True)
+    customer_type = models.CharField(default='consumer', choices=CUSTOMER_TYPE_CHOICES)
     name = models.CharField(max_length=255)
     mobile = models.CharField(max_length=20, blank=True)
     email = models.EmailField(blank=True)
@@ -555,10 +580,7 @@ class Customer(models.Model):
     def __str__(self):
         return f"{self.customer_code} - {self.name}"
 
-from django.conf import settings
-from django.core.validators import MinLengthValidator
-from django.db import models
-from django.utils import timezone
+
 
 
 class Ticket(models.Model):

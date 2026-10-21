@@ -44,14 +44,24 @@
                 <div class="col-md-4 text-end">
 
                     <button
+                        type="button"
+                        class="btn btn-outline-success me-2"
+                        data-bs-toggle="modal"
+                        data-bs-target="#uploadCustomersModal">
+
+                        <i class="fas fa-file-excel me-1"></i>
+                        Upload Excel
+
+                    </button>
+
+                    <button
+                        type="button"
                         class="btn btn-success"
                         data-bs-toggle="modal"
                         data-bs-target="#customerModal"
-                        id="btnAddCustomer"
-                    >
+                        id="btnAddCustomer">
 
                         <i class="fas fa-plus"></i>
-
                         Add Customer
 
                     </button>
@@ -84,6 +94,8 @@
 
                             <th>Code</th>
 
+                            <th>Type</th>
+
                             <th>Name</th>
 
                             <th>Mobile</th>
@@ -108,6 +120,8 @@
 
                             <td>{{ customer.customer_code }}</td>
 
+                            <td>{{ customer.get_customer_type_display }}</td>
+
                             <td>{{ customer.name }}</td>
 
                             <td>{{ customer.mobile }}</td>
@@ -124,6 +138,7 @@
                                     class="btn btn-sm btn-outline-primary editCustomer"
                                     data-id="{{ customer.id }}"
                                     data-code="{{ customer.customer_code }}"
+                                    data-type="{{ customer.customer_type }}"
                                     data-name="{{ customer.name }}"
                                     data-mobile="{{ customer.mobile }}"
                                     data-email="{{ customer.email }}"
@@ -178,12 +193,216 @@
 
                 </table>
 
+            
             </div>
+
+        </div>
+
+        <!-- Pagination -->
+        <div class="card-footer bg-white d-flex justify-content-between align-items-center flex-wrap gap-2">
+
+            <small class="text-muted">
+                Showing
+                {% if customers.paginator.count > 0 %}
+                    {{ customers.start_index }}–{{ customers.end_index }}
+                {% else %}
+                    0
+                {% endif %}
+                of {{ customers.paginator.count }} customers
+            </small>
+
+            {% if customers.paginator.num_pages > 1 %}
+
+            <nav aria-label="Customer pagination">
+                <ul class="pagination pagination-sm mb-0">
+
+                    <!-- Previous -->
+                    <li class="page-item {% if not customers.has_previous %}disabled{% endif %}">
+                        {% if customers.has_previous %}
+                            <a class="page-link"
+                               href="?search={{ search|urlencode }}&page={{ customers.previous_page_number }}">
+                                Previous
+                            </a>
+                        {% else %}
+                            <span class="page-link">Previous</span>
+                        {% endif %}
+                    </li>
+
+                    <!-- Page numbers -->
+                    {% for page_num in customers.paginator.page_range %}
+                    <li class="page-item {% if customers.number == page_num %}active{% endif %}">
+                        <a class="page-link"
+                           href="?search={{ search|urlencode }}&page={{ page_num }}">
+                            {{ page_num }}
+                        </a>
+                    </li>
+                    {% endfor %}
+
+                    <!-- Next -->
+                    <li class="page-item {% if not customers.has_next %}disabled{% endif %}">
+                        {% if customers.has_next %}
+                            <a class="page-link"
+                               href="?search={{ search|urlencode }}&page={{ customers.next_page_number }}">
+                                Next
+                            </a>
+                        {% else %}
+                            <span class="page-link">Next</span>
+                        {% endif %}
+                    </li>
+
+                </ul>
+            </nav>
+
+            {% endif %}
 
         </div>
 
     </div>
 
+</div>
+
+
+<!-- Upload Customers Excel Modal -->
+<div class="modal fade" id="uploadCustomersModal"
+     tabindex="-1" aria-labelledby="uploadCustomersModalLabel"
+     aria-hidden="true">
+
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content border-0 shadow">
+
+            <form method="POST"
+                  action="{% url 'sales_customers_excel' %}"
+                  enctype="multipart/form-data">
+
+                {% csrf_token %}
+
+                <div class="modal-header">
+                    <div>
+                        <h5 class="modal-title" id="uploadCustomersModalLabel">
+                            <i class="fas fa-file-excel text-success me-2"></i>
+                            Import Customers from Excel
+                        </h5>
+                        <small class="text-muted">
+                            Bulk import your customer records
+                        </small>
+                    </div>
+
+                    <button type="button" class="btn-close"
+                            data-bs-dismiss="modal"></button>
+                </div>
+
+                <div class="modal-body">
+
+                    <div class="alert alert-info">
+                        <h6 class="fw-bold">
+                            <i class="fas fa-info-circle me-1"></i>
+                            Excel File Instructions
+                        </h6>
+
+                        <p class="mb-2">
+                            The first row must contain all six column headers.
+                            Header capitalization and surrounding spaces are ignored.
+                        </p>
+
+                        <div class="table-responsive">
+                            <table class="table table-bordered table-sm bg-white mb-2">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>Type</th>
+                                        <th>Name</th>
+                                        <th>Mobile</th>
+                                        <th>Email</th>
+                                        <th>Payment</th>
+                                        <th>CreditLimit</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <td>consumer</td>
+                                        <td>Rahul Sharma</td>
+                                        <td>9876543210</td>
+                                        <td>rahul@example.com</td>
+                                        <td>cash</td>
+                                        <td>0</td>
+                                    </tr>
+                                    <tr>
+                                        <td>retailer</td>
+                                        <td>ABC Computers</td>
+                                        <td>9876501234</td>
+                                        <td></td>
+                                        <td>credit</td>
+                                        <td>25000</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <ul class="small mb-0">
+                            <li>
+                                All six column headers are required, even if
+                                some values are optional.
+                            </li>
+                            <li>
+                                Type must be consumer, retailer, or wholesaler.
+                            </li>
+                            <li>
+                                Name and Mobile cannot be blank.
+                            </li>
+                            <li>
+                                Payment must be cash or credit. A blank value
+                                defaults to cash.
+                            </li>
+                            <li>
+                                Email may be blank. CreditLimit defaults to 0
+                                and cannot be negative.
+                            </li>
+                            <li>
+                                Format Mobile cells as Text to preserve leading
+                                zeros and long numbers.
+                            </li>
+                            <li>
+                                Customer codes are generated automatically.
+                            </li>
+                        </ul>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="customersExcelFile"
+                               class="form-label fw-semibold">
+                            Select Excel File
+                        </label>
+
+                        <input type="file"
+                               class="form-control"
+                               id="customersExcelFile"
+                               name="excel_file"
+                               accept=".xlsx,.xls"
+                               required>
+
+                        <div class="form-text">
+                            Supported formats: .xlsx and .xls. Maximum size: 5 MB.
+                        </div>
+                    </div>
+
+                </div>
+
+                <div class="modal-footer">
+                    <button type="button"
+                            class="btn btn-light"
+                            data-bs-dismiss="modal">
+                        Cancel
+                    </button>
+
+                    <button type="submit" class="btn btn-success">
+                        <i class="fas fa-upload me-1"></i>
+                        Import Customers
+                    </button>
+                </div>
+
+            </form>
+
+        </div>
+    </div>
 </div>
 
 <!-- Customer Modal -->
@@ -227,6 +446,36 @@
                 <div class="modal-body">
 
                     <div class="row">
+
+                        <div class="col-md-6">
+
+                            <label>Customer Code</label>
+
+                            <input
+                                class="form-control"
+                                name="customer_code"
+                                id="customer_code"
+                                required
+                                readonly
+                            >
+
+                        </div>
+
+                        <div class="col-md-6">
+
+                            <label>Customer Type</label>
+
+                            <select
+                                class="form-select"
+                                name="customer_type"
+                                id="customer_type"
+                            >
+                                <option value="consumer">Consumer</option>
+                                <option value="retailer">Retailer</option>
+                                <option value="wholesaler">Wholesaler</option>
+                            </select>
+
+                        </div>
 
                         <div class="col-md-6">
 
@@ -380,6 +629,7 @@ document.addEventListener("DOMContentLoaded", function () {
         document.getElementById("customerForm").reset();
 
         document.getElementById("customer_id").value = "";
+        document.getElementById("customer_code").value = "";
 
         document.getElementById("customerModalTitle").innerText = "Add Customer";
 
@@ -392,6 +642,10 @@ document.addEventListener("DOMContentLoaded", function () {
             document.getElementById("customerModalTitle").innerText="Edit Customer";
 
             document.getElementById("customer_id").value=this.dataset.id;
+
+            document.getElementById("customer_code").value=this.dataset.code;
+
+            document.getElementById("customer_type").value=this.dataset.type;
 
             document.getElementById("name").value=this.dataset.name;
 
@@ -414,6 +668,32 @@ document.addEventListener("DOMContentLoaded", function () {
     });
 
 });
+
+// ==================================================
+// AUTO-GENERATE CUSTOMER CODE
+// ==================================================
+
+const customerName = document.getElementById("name");
+const customerMobile = document.getElementById("mobile");
+const customerCode = document.getElementById("customer_code");
+
+function generateCustomerCode() {
+
+    const name = customerName.value.trim();
+    const mobile = customerMobile.value.replace(/\D/g, "");
+
+    const namePart = name
+        .replace(/[^a-zA-Z]/g, "")
+        .substring(0, 4)
+        .toUpperCase();
+
+    const mobilePart = mobile.slice(-4);
+
+    customerCode.value = namePart + mobilePart;
+}
+
+customerName.addEventListener("input", generateCustomerCode);
+customerMobile.addEventListener("input", generateCustomerCode);
 
 </script>
 

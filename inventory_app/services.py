@@ -819,7 +819,7 @@ class CustomerService:
 
         return Customer.objects.create(
 
-            customer_code=CustomerService.generate_customer_code(),
+            customer_code=request.POST.get("customer_code") or CustomerService.generate_customer_code(),
 
             name=request.POST.get("name"),
 

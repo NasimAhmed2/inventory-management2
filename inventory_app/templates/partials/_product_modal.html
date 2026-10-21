@@ -75,6 +75,44 @@
 
                         </div>
 
+                        <!-- Brand -->
+
+                        <div class="col-md-6 mb-3">
+
+                            <label class="form-label">
+
+                                Brand
+
+                            </label>
+
+                            <input
+                                id="brand"
+                                name="brand"
+                                type="text"
+                                class="form-control"
+                                required>
+
+                        </div>
+
+                        <!-- Model Number -->
+
+                        <div class="col-md-6 mb-3">
+
+                            <label class="form-label">
+
+                                Model Number
+
+                            </label>
+
+                            <input
+                                id="model_number"
+                                name="model_number"
+                                type="text"
+                                class="form-control"
+                                required>
+
+                        </div>
+
                         <!-- Category -->
 
                         <div class="col-md-6 mb-3">
@@ -139,7 +177,7 @@
 
                         <!-- Specification -->
 
-                        <div class="col-md-12 mb-3">
+                        <div class="col-md-10 mb-3">
 
                             <label class="form-label">
 
@@ -154,6 +192,27 @@
                                 class="form-control">
 
                         </div>
+
+                        <div class="col-md-2 mb-3">
+                            <label class="form-label">Stock Tracking</label>
+
+                            <div>
+                                <input
+                                    type="checkbox"
+                                    id="stock_tracking"
+                                    name="stock_tracking"
+                                    value="True"
+                                    class="form-check-input stock-checkbox">
+                            </div>
+                        </div>
+
+                        <style>
+                            .stock-checkbox {
+                                transform: scale(1.5);
+                                transform-origin: left center;
+                                cursor: pointer;
+                            }
+                        </style>
 
                         <!--Selling Price -->
 
@@ -255,6 +314,42 @@
                                 value="10">
 
                         </div>
+
+                        <!--opening Qty -->
+
+                        <div class="col-md-4 mb-3">
+
+                            <label class="form-label">
+
+                                Opening Qty
+
+                            </label>
+
+                            <input
+                                id="opening_qty"
+                                name="opening_qty"
+                                type="text"
+                                class="form-control">
+
+                        </div>
+                        <!--opening Qty Purchase price-->
+                        <div class="col-md-4 mb-3">
+
+                            <label class="form-label">
+
+                                Purchase Price
+
+                            </label>
+
+                            <input
+                                id="purchase_price"
+                                name="purchase_price"
+                                type="text"
+                                class="form-control">
+
+                        </div>
+
+                        
 
                     </div>
 

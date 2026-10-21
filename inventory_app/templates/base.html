@@ -169,6 +169,9 @@
             <i class="fas fa-chevron-down toggle-icon"></i>
         </div>
         <div id="section-inventory" class="nav-section{% if request.resolver_match.url_name != 'inventory_products' and request.resolver_match.url_name != 'inventory_stock' and request.resolver_match.url_name != 'inventory_movements' %} collapsed{% endif %}">
+            <a href="{% url 'inventory_products_categories' %}" class="{% if request.resolver_match.url_name == 'inventory_products_categories' %}active{% endif %}">
+                <i class="fas fa-box"></i> Product Categories
+            </a>
             <a href="{% url 'inventory_products' %}" class="{% if request.resolver_match.url_name == 'inventory_products' %}active{% endif %}">
                 <i class="fas fa-box"></i> Products
             </a>

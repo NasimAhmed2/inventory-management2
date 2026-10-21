@@ -1,0 +1,463 @@
+
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Product Categories & HSN{% endblock %}
+
+{% block content %}
+
+<div class="container-fluid">
+
+    {% if messages %}
+        {% for message in messages %}
+            <div class="alert alert-{{ message.tags }} alert-dismissible fade show">
+                {{ message }}
+                <button type="button" class="btn-close"
+                        data-bs-dismiss="alert"></button>
+            </div>
+        {% endfor %}
+    {% endif %}
+
+    <div class="card shadow-sm border-0">
+
+        <div class="card-header bg-white py-3">
+            <div class="row align-items-center g-3">
+
+                <div class="col-md-6">
+                    <h4 class="mb-1">
+                        <i class="fas fa-layer-group text-primary me-2"></i>
+                        Product Categories
+                    </h4>
+                    <small class="text-muted">
+                        Manage product categories and HSN descriptions
+                    </small>
+                </div>
+
+                <div class="col-md-6 text-md-end">
+                    <button class="btn btn-outline-primary me-2"
+                            data-bs-toggle="modal"
+                            data-bs-target="#addHsnModal">
+                        <i class="fas fa-plus me-1"></i>
+                        Add HSN
+                    </button>
+
+                    <button class="btn btn-primary"
+                            data-bs-toggle="modal"
+                            data-bs-target="#addCategoryModal">
+                        <i class="fas fa-folder-plus me-1"></i>
+                        Add Category
+                    </button>
+
+                    <button class="btn btn-outline-success me-2"
+                            data-bs-toggle="modal"
+                            data-bs-target="#uploadHsnModal">
+                        <i class="fas fa-file-excel me-1"></i>
+                        Upload File
+                    </button>
+                </div>
+
+            </div>
+        </div>
+
+        <div class="card-body">
+
+            <div class="row g-3 mb-4">
+
+                <div class="col-sm-6 col-xl-4">
+                    <div class="border rounded-3 p-3 h-100">
+                        <div class="text-muted small">Total Categories</div>
+                        <div class="fs-3 fw-semibold">
+                            {{ categories|length }}
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-sm-6 col-xl-4">
+                    <div class="border rounded-3 p-3 h-100">
+                        <div class="text-muted small">Total HSN Entries</div>
+                        <div class="fs-3 fw-semibold">
+                            {{ entries|length }}
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+
+            <div class="table-responsive">
+                <table class="table table-hover align-middle">
+
+                    <thead class="table-light">
+                        <tr>
+                            <th style="width: 25%">Category</th>
+                            <th style="width: 18%">HSN Code</th>
+                            <th>Description</th>
+                            <th class="text-center" style="width: 100px">
+                                Action
+                            </th>
+                        </tr>
+                    </thead>
+
+                    <tbody>
+                        {% for entry in entries %}
+                        <tr>
+
+                            <td>
+                                <span class="fw-semibold">
+                                    {{ entry.category_name }}
+                                </span>
+                            </td>
+
+                            <td>
+                                {% if entry.hsn_code %}
+                                    <span class="badge bg-primary text-white px-3 py-2">
+                                        {{ entry.hsn_code }}
+                                    </span>
+                                {% else %}
+                                    <span class="text-muted">—</span>
+                                {% endif %}
+                            </td>
+
+                            <td>
+                                {{ entry.description|default:"—" }}
+                            </td>
+
+                            <td class="text-center">
+                                <button type="button"
+                                        class="btn btn-sm btn-outline-primary edit-hsn"
+                                        data-id="{{ entry.id }}"
+                                        data-category="{{ entry.category_name }}"
+                                        data-hsn="{{ entry.hsn_code }}"
+                                        data-description="{{ entry.description|escape }}"
+                                        data-bs-toggle="modal"
+                                        data-bs-target="#editHsnModal"
+                                        title="Edit entry">
+                                    <i class="fas fa-edit"></i>
+                                </button>
+                            </td>
+
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="4" class="text-center py-5">
+                                <i class="fas fa-folder-open fa-2x text-muted mb-3"></i>
+                                <div class="fw-semibold">No categories yet</div>
+                                <div class="text-muted small">
+                                    Add your first category and HSN entry.
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+
+                </table>
+            </div>
+
+        </div>
+    </div>
+</div>
+
+
+<!-- Add Category Modal -->
+<div class="modal fade" id="addCategoryModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+
+            <form method="post">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="add_category">
+
+                <div class="modal-header">
+                    <h5 class="modal-title">Add Category</h5>
+                    <button type="button" class="btn-close"
+                            data-bs-dismiss="modal"></button>
+                </div>
+
+                <div class="modal-body">
+
+                    <div class="mb-3">
+                        <label class="form-label">Category Name</label>
+                        <input type="text" name="category_name"
+                               class="form-control" required>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">First HSN Code</label>
+                        <input type="text" name="hsn_code"
+                               class="form-control">
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">HSN Description</label>
+                        <textarea name="description"
+                                  class="form-control" rows="3"></textarea>
+                    </div>
+
+                </div>
+
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-light"
+                            data-bs-dismiss="modal">Cancel</button>
+                    <button class="btn btn-primary">Save Category</button>
+                </div>
+            </form>
+
+        </div>
+    </div>
+</div>
+
+
+<!-- Add HSN Modal -->
+<div class="modal fade" id="addHsnModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+
+            <form method="post">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="add_hsn">
+
+                <div class="modal-header">
+                    <h5 class="modal-title">Add HSN Entry</h5>
+                    <button type="button" class="btn-close"
+                            data-bs-dismiss="modal"></button>
+                </div>
+
+                <div class="modal-body">
+
+                    <div class="mb-3">
+                        <label class="form-label">Category</label>
+                        <select name="category_name" class="form-select" required>
+                            <option value="">Select Category</option>
+                            {% for category in categories %}
+                                <option value="{{ category }}">
+                                    {{ category }}
+                                </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">HSN Code</label>
+                        <input type="text" name="hsn_code"
+                               class="form-control" required>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">HSN Description</label>
+                        <textarea name="description"
+                                  class="form-control" rows="3"></textarea>
+                    </div>
+
+                </div>
+
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-light"
+                            data-bs-dismiss="modal">Cancel</button>
+                    <button class="btn btn-primary">Add HSN</button>
+                </div>
+            </form>
+
+        </div>
+    </div>
+</div>
+
+
+<!-- Edit HSN Modal -->
+<div class="modal fade" id="editHsnModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+
+            <form method="post">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="edit_hsn">
+                <input type="hidden" name="entry_id" id="edit_entry_id">
+
+                <div class="modal-header">
+                    <h5 class="modal-title">Edit HSN Entry</h5>
+                    <button type="button" class="btn-close"
+                            data-bs-dismiss="modal"></button>
+                </div>
+
+                <div class="modal-body">
+
+                    <div class="mb-3">
+                        <label class="form-label">Category</label>
+                        <input type="text" name="category_name"
+                               id="edit_category"
+                               class="form-control" required>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">HSN Code</label>
+                        <input type="text" name="hsn_code"
+                               id="edit_hsn"
+                               class="form-control" required>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">HSN Description</label>
+                        <textarea name="description"
+                                  id="edit_description"
+                                  class="form-control" rows="3"></textarea>
+                    </div>
+
+                </div>
+
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-light"
+                            data-bs-dismiss="modal">Cancel</button>
+                    <button class="btn btn-primary">Save Changes</button>
+                </div>
+            </form>
+
+        </div>
+    </div>
+</div>
+
+
+<!-- Upload HSN Excel Modal -->
+<div class="modal fade" id="uploadHsnModal" tabindex="-1"
+     aria-labelledby="uploadHsnModalLabel" aria-hidden="true">
+
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow">
+
+            <form method="POST"
+                  action="{% url 'inventory_products_categories_excel' %}"
+                  enctype="multipart/form-data">
+
+                {% csrf_token %}
+
+                <div class="modal-header">
+                    <div>
+                        <h5 class="modal-title" id="uploadHsnModalLabel">
+                            <i class="fas fa-file-excel text-success me-2"></i>
+                            Upload HSN Excel File
+                        </h5>
+                        <small class="text-muted">
+                            Import product categories and HSN codes
+                        </small>
+                    </div>
+
+                    <button type="button" class="btn-close"
+                            data-bs-dismiss="modal"></button>
+                </div>
+
+                <div class="modal-body">
+
+                    <div class="alert alert-info">
+                        <strong>
+                            <i class="fas fa-info-circle me-1"></i>
+                            Excel File Instructions
+                        </strong>
+
+                        <p class="mb-2 mt-2">
+                            Your first row must contain these three column headers:
+                        </p>
+
+                        <div class="d-flex flex-wrap gap-2 mb-2">
+                            <span class="badge bg-primary">category</span>
+                            <span class="badge bg-primary">description</span>
+                            <span class="badge bg-primary">hsn</span>
+                        </div>
+
+                        <small>
+                            Example data:
+                        </small>
+
+                        <div class="table-responsive mt-2">
+                            <table class="table table-sm table-bordered bg-white mb-2">
+                                <thead>
+                                    <tr>
+                                        <th>category</th>
+                                        <th>description</th>
+                                        <th>hsn</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <td>Storage</td>
+                                        <td>Solid State Drive</td>
+                                        <td>84717030</td>
+                                    </tr>
+                                    <tr>
+                                        <td>Networking</td>
+                                        <td>Network Router</td>
+                                        <td>851762</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <small>
+                            Column names are case-insensitive. Category and HSN
+                            values are required for each data row. Description
+                            can be left blank.
+                        </small>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="hsnExcelFile" class="form-label fw-semibold">
+                            Select Excel File
+                        </label>
+
+                        <input type="file"
+                               class="form-control"
+                               id="hsnExcelFile"
+                               name="excel_file"
+                               accept=".xlsx,.xls"
+                               required>
+
+                        <div class="form-text">
+                            Supported formats: .xlsx and .xls
+                        </div>
+                    </div>
+
+                </div>
+
+                <div class="modal-footer">
+                    <button type="button"
+                            class="btn btn-light"
+                            data-bs-dismiss="modal">
+                        Cancel
+                    </button>
+
+                    <button type="submit" class="btn btn-success">
+                        <i class="fas fa-upload me-1"></i>
+                        Upload and Import
+                    </button>
+                </div>
+
+            </form>
+
+        </div>
+    </div>
+</div>
+
+
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+
+    document.querySelectorAll(".edit-hsn").forEach(function (button) {
+
+        button.addEventListener("click", function () {
+
+            document.getElementById("edit_entry_id").value =
+                this.dataset.id;
+
+            document.getElementById("edit_category").value =
+                this.dataset.category;
+
+            document.getElementById("edit_hsn").value =
+                this.dataset.hsn;
+
+            document.getElementById("edit_description").value =
+                this.dataset.description;
+
+        });
+
+    });
+
+});
+</script>
+
+{% endblock %}
