@@ -552,29 +552,29 @@ document.addEventListener("DOMContentLoaded", function () {
 
 
     // ==========================================================
-        // Row Events
-        // ==========================================================
+    // Row Events
+    // ==========================================================
 
-        function attachRowEvents(row) {
-            console.log("ATTACH ROW EVENTS FIRED");
+    function attachRowEvents(row) {
+        console.log("ATTACH ROW EVENTS FIRED");
 
-            const searchInput =
-                row.querySelector(".product-search");
+        const searchInput =
+            row.querySelector(".product-search");
 
-            const suggestions =
-                row.querySelector(".product-suggestions");
+        const suggestions =
+            row.querySelector(".product-suggestions");
 
-            const quantityInput =
-                row.querySelector(".item-quantity");
+        const quantityInput =
+            row.querySelector(".item-quantity");
 
-            const rateInput =
-                row.querySelector(".item-rate");
+        const rateInput =
+            row.querySelector(".item-rate");
 
-            const taxInput =
-                row.querySelector(".item-tax-percentage");
+        const taxInput =
+            row.querySelector(".item-tax-percentage");
 
-            const removeButton =
-                row.querySelector(".remove-item");
+        const removeButton =
+            row.querySelector(".remove-item");
 
 
         // ======================================================
@@ -803,6 +803,8 @@ document.addEventListener("DOMContentLoaded", function () {
         });
 
     }
+
+    
 
     // ==========================================================
     // Select Product
@@ -1728,5 +1730,9 @@ document.addEventListener("DOMContentLoaded", function () {
             }
         );
 
+    
+
 
 });
+
+

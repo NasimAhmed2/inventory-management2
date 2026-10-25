@@ -9,19 +9,15 @@ from django.core.mail import EmailMessage
 from io import BytesIO
 from openpyxl import Workbook
 from openpyxl.styles import Font, Alignment
+from decimal import Decimal
+from django.db import transaction
+from django.utils.dateparse import parse_date
 
 from .models import (
-    Product,
-    ServiceReport,
-    ServiceReportItem,
-    Ticket,
-    InventoryMovement, 
-    InventoryStock, 
-    Customer, 
-    Ticket,
-    SalesLineItem,
-    SalesInvoice,
-    VendorLedger,
+    Product,ServiceReport,ServiceReportItem,Ticket,
+    InventoryMovement, InventoryStock, Customer, Ticket,
+    SalesLineItem,SalesInvoice,VendorLedger,
+    InvoicePayment, Dues
 )
 
 
@@ -1366,6 +1362,120 @@ class SaleService:
         except (InvalidOperation, TypeError, ValueError):
             return default
 
+
+    @staticmethod
+    def _save_payment_details(invoice, request):
+
+        payment_type = request.POST.get(
+            "payment_type",
+            "single",
+        ).strip().lower()
+
+        if payment_type not in ("single", "split"):
+            raise ValueError("Invalid payment type.")
+
+        total = invoice.grand_total
+
+        cash = Decimal("0.00")
+        upi = Decimal("0.00")
+        card = Decimal("0.00")
+        credit = Decimal("0.00")
+
+        if payment_type == "single":
+
+            mode = request.POST.get(
+                "single_payment_mode",
+                request.POST.get("payment_mode", "cash"),
+            ).strip().lower()
+
+            if mode not in ("cash", "upi", "card", "credit"):
+                raise ValueError("Invalid payment mode.")
+
+            if mode == "cash":
+                cash = total
+            elif mode == "upi":
+                upi = total
+            elif mode == "card":
+                card = total
+            else:
+                credit = total
+
+        else:
+            cash = SaleService.decimal_value(
+                request.POST.get("cash_amount")
+                or request.POST.get("split_cash")
+            )
+
+            upi = SaleService.decimal_value(
+                request.POST.get("upi_amount")
+                or request.POST.get("split_upi")
+            )
+
+            card = SaleService.decimal_value(
+                request.POST.get("card_amount")
+                or request.POST.get("split_card")
+            )
+
+            credit = SaleService.decimal_value(
+                request.POST.get("credit_amount")
+                or request.POST.get("split_credit")
+            )
+
+        amounts = [cash, upi, card, credit]
+
+        if any(amount < 0 for amount in amounts):
+            raise ValueError("Payment amounts cannot be negative.")
+
+        allocated_total = sum(amounts, Decimal("0.00"))
+
+        if allocated_total != total:
+            raise ValueError(
+                f"Payment amounts total ₹{allocated_total}, "
+                f"but invoice total is ₹{total}."
+            )
+
+        due_date_value = (
+            request.POST.get("due_date")
+            or request.POST.get("single_due_date")
+            or request.POST.get("split_due_date")
+            or request.POST.get("single-due-date")
+            or request.POST.get("split-due-date")
+        )
+
+        due_date = None
+
+        if credit > 0:
+            due_date = parse_date(due_date_value or "")
+
+            if not due_date:
+                raise ValueError(
+                    "Please select a valid due date for the credit amount."
+                )
+
+        payment = InvoicePayment.objects.create(
+            payment_type=payment_type,
+            cash_amount=cash,
+            upi_amount=upi,
+            card_amount=card,
+            credit_amount=credit,
+        )
+
+        invoice.payment_details = payment
+
+        # Maintain the legacy field for existing code.
+        if payment_type == "single":
+            invoice.payment_mode = mode
+
+        invoice.save(update_fields=["payment_details", "payment_mode"])
+
+        if credit > 0:
+            Dues.objects.create(
+                customer=invoice.customer,
+                invoice=invoice,
+                amount=credit,
+                due_date=due_date,
+            )
+
     # ==========================================================
     # DIRECT SALE
     # ==========================================================
@@ -1427,6 +1537,10 @@ class SaleService:
             invoice=invoice,
             discount=discount,
         )
+
+        # SaleService._finalize_invoice(invoice)
+
+        SaleService._save_payment_details(invoice, request)
 
         return invoice
 
@@ -1716,6 +1830,8 @@ class SaleService:
             ]
         )
 
+        SaleService._save_payment_details(invoice, request)
+
         # IMPORTANT:
         #
         # We DO NOT call InventoryService.sale()
@@ -1880,6 +1996,8 @@ class SaleService:
             invoice=invoice,
             discount=discount,
         )
+
+        SaleService._save_payment_details(invoice, request)
 
         return invoice
 

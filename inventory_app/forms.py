@@ -1,14 +1,15 @@
 from django import forms
 from .models import Product
-# from .models import Product_Categories
+from .models import Product_Categories
 
 CATEGORY_HSN = {}
 
-# for entry in Product_Categories.objects.all():
-#     CATEGORY_HSN.setdefault(entry.category_name, []).append(
-#         (entry.hsn_code, entry.description)
-#     )
+for entry in Product_Categories.objects.all():
+    CATEGORY_HSN.setdefault(entry.category_name, []).append(
+        (entry.hsn_code, entry.description)
+    )
 
+print("CATEGORY_HSN:", CATEGORY_HSN)  # Debugging line to check the contents of CATEGORY_HSN
 
 class ProductForm(forms.ModelForm):
     category = forms.ChoiceField(
@@ -55,6 +56,9 @@ class ProductForm(forms.ModelForm):
             "model_number",
             "specification",
             "unit_of_measure",
+            "selling_price",
+            "whole_sale_price",
+            "whole_sale_qty",
             "reorder_level",
             "opening_qty",
             "purchase_price",
@@ -89,6 +93,21 @@ class ProductForm(forms.ModelForm):
             "reorder_level": forms.NumberInput(attrs={
                 "class": "form-control",
                 "min": 0
+            }),
+            "selling_price": forms.NumberInput(attrs={
+                "class": "form-control",
+                "min": 0,
+                "step": "0.01",
+            }),
+            "whole_sale_price": forms.NumberInput(attrs={
+                "class": "form-control",
+                "min": 0,
+                "step": "0.01",
+            }),
+            "whole_sale_qty": forms.NumberInput(attrs={
+                "class": "form-control",
+                "min": 0,
+                "step": 1,
             }),
         }
 

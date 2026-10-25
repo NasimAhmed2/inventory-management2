@@ -20,7 +20,7 @@ import xlrd
 from .models import (
     Product, PurchaseInvoice, PurchaseLineItem, UserProfile, Vendor, 
     ServiceReport, Customer, Ticket, SalesInvoice, VendorLedger,  
-    Product_Categories,  
+    Product_Categories, SalesLineItem, 
 )
 
 from .services import (
@@ -51,10 +51,12 @@ User = get_user_model()
 
 CATEGORY_HSN = {}
 
-# for entry in Product_Categories.objects.all():
-#     CATEGORY_HSN.setdefault(entry.category_name, []).append(
-#         (entry.hsn_code, entry.description)
-#     )
+for entry in Product_Categories.objects.all():
+    CATEGORY_HSN.setdefault(entry.category_name, []).append(
+        (entry.hsn_code, entry.description)
+    )
+
+print("CATEGORY_HSN:", CATEGORY_HSN)  # Debugging line to check the contents of CATEGORY_HSN
 
 def generate_customer_code():
 
@@ -80,6 +82,99 @@ def generate_customer_code():
 def placeholder_view(request, page_title="Coming Soon"):
     return render(request, "placeholder.html", {"page_title": page_title})
 
+
+
+def day_reports(request):
+    today = timezone.localdate()
+    zero = Decimal("0.00")
+
+    # Purchases dated today
+    purchases = PurchaseInvoice.objects.filter(
+        invoice_date=today
+    ).select_related("vendor")
+
+    purchase_total = purchases.aggregate(
+        total=Sum("grand_total")
+    )["total"] or zero
+
+    # Only today's sale invoices
+    sales_invoices = SalesInvoice.objects.filter(
+        invoice_date=today
+    ).select_related("customer", "payment_details")
+
+    sale_lines = SalesLineItem.objects.filter(
+        invoice__in=sales_invoices
+    ).select_related("invoice")
+
+    # Product costs from InventoryStock.last_cost
+    item_codes = set(sale_lines.values_list("item_code", flat=True))
+
+    product_costs = dict(
+        InventoryStock.objects.filter(
+            product__item_code__in=item_codes
+        ).values_list("product__item_code", "last_cost")
+    )
+
+    sales_total = zero
+    return_total = zero
+    cost_total = zero
+    invoice_sales = {}
+
+    for line in sale_lines:
+        line_amount = line.rate * line.quantity
+        invoice_id = line.invoice_id
+
+        invoice_sales[invoice_id] = (
+            invoice_sales.get(invoice_id, zero) + line_amount
+        )
+
+        if line.invoice.sale_type == "RETURN":
+            return_total += line_amount
+        else:
+            sales_total += line_amount
+
+            unit_cost = product_costs.get(line.item_code) or zero
+            cost_total += unit_cost * line.quantity
+
+    # Estimated profit on regular sales, before other expenses
+    estimated_profit = sales_total - cost_total
+
+    # Today's payment collection totals
+    payment_totals = sales_invoices.aggregate(
+        cash=Sum("payment_details__cash_amount"),
+        upi=Sum("payment_details__upi_amount"),
+        card=Sum("payment_details__card_amount"),
+        credit=Sum("payment_details__credit_amount"),
+    )
+
+    cash_total = payment_totals["cash"] or zero
+    upi_total = payment_totals["upi"] or zero
+    card_total = payment_totals["card"] or zero
+    credit_total = payment_totals["credit"] or zero
+
+    collection_total = cash_total + upi_total + card_total
+
+    # Show each invoice's line-item value in the invoice table
+    for invoice in sales_invoices:
+        invoice.report_total = invoice_sales.get(invoice.pk, zero)
+
+    context = {
+        "today": today,
+        "purchases": purchases,
+        "sales_invoices": sales_invoices,
+        "purchase_total": purchase_total,
+        "sales_total": sales_total,
+        "return_total": return_total,
+        "cost_total": cost_total,
+        "estimated_profit": estimated_profit,
+        "cash_total": cash_total,
+        "upi_total": upi_total,
+        "card_total": card_total,
+        "credit_total": credit_total,
+        "collection_total": collection_total,
+    }
+
+    return render(request, "day_reports.html", context)
 
 
 def sales_customers(request):
@@ -2380,6 +2475,7 @@ def inventory_products_excel(request):
             "hsn",
             "specification",
             "unit",
+            "opening stock",
             "reorder",
         ]
 
@@ -2438,6 +2534,7 @@ def inventory_products_excel(request):
                 hsn = cell_value(row, "hsn")
                 specification = cell_value(row, "specification")
                 unit = cell_value(row, "unit")
+                opening_stock_text = cell_value(row, "opening stock")
                 reorder_text = cell_value(row, "reorder")
 
                 # Required values
@@ -2484,7 +2581,8 @@ def inventory_products_excel(request):
 
                         # Initialize stock at zero
                         InventoryStock.objects.get_or_create(
-                            product=product
+                            product=product,
+                            quantity_on_hand=int(opening_stock_text) if opening_stock_text else 0,
                         )
 
                     imported += 1

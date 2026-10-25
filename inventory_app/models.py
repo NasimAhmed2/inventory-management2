@@ -210,15 +210,28 @@ class Product(models.Model):
     specification = models.CharField(max_length=255, blank=True)
     hs_code = models.CharField(max_length=50, blank=True)
     unit_of_measure = models.CharField(max_length=20, default='pcs')
-    selling_price = models.DecimalField(max_digits=12, decimal_places=2,default=0)
+
+    selling_price = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        default=0,
+    )
+
+    whole_sale_price = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        default=0,
+    )
+
+    whole_sale_qty = models.PositiveIntegerField(default=0)
+
     reorder_level = models.IntegerField(default=10)
     category = models.CharField(max_length=100)
-    brand = models.CharField(max_length=100,blank=True)
-    model_number = models.CharField(max_length=100,blank=True)
+    brand = models.CharField(max_length=100, blank=True)
+    model_number = models.CharField(max_length=100, blank=True)
     stock_tracking = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
-    
 
     class Meta:
         ordering = ['item_code']
@@ -966,6 +979,50 @@ class ServiceReportItem(models.Model):
 
         super().save(*args, **kwargs)
 
+class InvoicePayment(models.Model):
+
+    PAYMENT_TYPE_CHOICES = [
+        ("single", "Single Payment"),
+        ("split", "Split Payment"),
+    ]
+
+    payment_type = models.CharField(
+        max_length=10,
+        choices=PAYMENT_TYPE_CHOICES,
+        default="single",
+    )
+
+    cash_amount = models.DecimalField(
+        max_digits=15,
+        decimal_places=2,
+        default=0,
+    )
+
+    upi_amount = models.DecimalField(
+        max_digits=15,
+        decimal_places=2,
+        default=0,
+    )
+
+    card_amount = models.DecimalField(
+        max_digits=15,
+        decimal_places=2,
+        default=0,
+    )
+
+    credit_amount = models.DecimalField(
+        max_digits=15,
+        decimal_places=2,
+        default=0,
+    )
+
+    created_at = models.DateTimeField(
+        auto_now_add=True,
+    )
+
+    def __str__(self):
+        return f"Payment #{self.pk}"
+
 
 class SalesInvoice(models.Model):
 
@@ -1034,6 +1091,14 @@ class SalesInvoice(models.Model):
         default="draft",
     )
 
+    payment_details = models.OneToOneField(
+        InvoicePayment,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="sales_invoice",
+    )
+
     total_amount = models.DecimalField(
         max_digits=15,
         decimal_places=2,
@@ -1076,6 +1141,35 @@ class SalesInvoice(models.Model):
 
     def __str__(self):
         return f"{self.invoice_number} - {self.customer.name}"
+
+
+class Dues(models.Model):
+
+    customer = models.ForeignKey(
+        Customer,
+        on_delete=models.PROTECT,
+        related_name="dues",
+    )
+
+    invoice = models.OneToOneField(
+        SalesInvoice,
+        on_delete=models.PROTECT,
+        related_name="due",
+    )
+
+    amount = models.DecimalField(
+        max_digits=15,
+        decimal_places=2,
+    )
+
+    due_date = models.DateField()
+
+    created_at = models.DateTimeField(
+        auto_now_add=True,
+    )
+
+    def __str__(self):
+        return f"{self.customer} - {self.amount}"
 
 
 class SalesLineItem(models.Model):

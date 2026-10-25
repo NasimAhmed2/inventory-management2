@@ -183,30 +183,56 @@
             </a>
         </div>
 
-        <div class="nav-section-title nav-toggle{% if request.resolver_match.url_name == 'sales_invoices' or request.resolver_match.url_name == 'tickets' or request.resolver_match.url_name == 'service_reports' or request.resolver_match.url_name == 'sales_invoices' %} expanded{% endif %}" data-target="section-sales">
+        
+        <!-- SALES -->
+        <div class="nav-section-title nav-toggle
+            {% if request.resolver_match.url_name == 'sales_customers' or request.resolver_match.url_name == 'sales_invoices' %}expanded{% endif %}"
+            data-target="section-sales">
+
             <span>Sales</span>
             <i class="fas fa-chevron-down toggle-icon"></i>
         </div>
 
-        <div id="section-sales" class="nav-section{% if request.resolver_match.url_name != 'sales_customers' and request.resolver_match.url_name != 'tickets' and request.resolver_match.url_name != 'service_reports' and request.resolver_match.url_name != 'sales_invoices' %} collapsed{% endif %}">
+        <div id="section-sales" class="nav-section
+            {% if request.resolver_match.url_name != 'sales_customers' and request.resolver_match.url_name != 'sales_invoices' %}collapsed{% endif %}">
 
-            <a href="{% url 'sales_customers' %}" class="{% if request.resolver_match.url_name == 'sales_customers' %}active{% endif %}">
+            <a href="{% url 'sales_customers' %}"
+            class="{% if request.resolver_match.url_name == 'sales_customers' %}active{% endif %}">
                 <i class="fas fa-users"></i> Customers
             </a>
 
-            <a href="{% url 'tickets' %}" class="{% if request.resolver_match.url_name == 'tickets' %}active{% endif %}">
-                <i class="fas fa-ticket-alt"></i> Tickets
-            </a>
-
-            <a href="{% url 'service_reports' %}" class="{% if request.resolver_match.url_name == 'service_reports' %}active{% endif %}">
-                <i class="fas fa-tools"></i> Service Reports
-            </a>
-
-            <a href="{% url 'sales_invoices' %}" class="{% if request.resolver_match.url_name == 'sales_invoices' %}active{% endif %}">
+            <a href="{% url 'sales_invoices' %}"
+            class="{% if request.resolver_match.url_name == 'sales_invoices' %}active{% endif %}">
                 <i class="fas fa-receipt"></i> Sales Invoices
             </a>
 
         </div>
+
+
+        <!-- SERVICES -->
+        <div class="nav-section-title nav-toggle
+            {% if request.resolver_match.url_name == 'tickets' or request.resolver_match.url_name == 'service_reports' %}expanded{% endif %}"
+            data-target="section-services">
+
+            <span>Services</span>
+            <i class="fas fa-chevron-down toggle-icon"></i>
+        </div>
+
+        <div id="section-services" class="nav-section
+            {% if request.resolver_match.url_name != 'tickets' and request.resolver_match.url_name != 'service_reports' %}collapsed{% endif %}">
+
+            <a href="{% url 'tickets' %}"
+            class="{% if request.resolver_match.url_name == 'tickets' %}active{% endif %}">
+                <i class="fas fa-ticket-alt"></i> Tickets
+            </a>
+
+            <a href="{% url 'service_reports' %}"
+            class="{% if request.resolver_match.url_name == 'service_reports' %}active{% endif %}">
+                <i class="fas fa-tools"></i> Service Reports
+            </a>
+
+        </div>
+
 
         <div class="nav-section-title nav-toggle{% if request.resolver_match.url_name == 'warehouse_locations' or request.resolver_match.url_name == 'warehouse_challans' %} expanded{% endif %}" data-target="section-warehouse">
             <span>Warehouse</span>
@@ -221,18 +247,33 @@
             </a>
         </div>
 
-        <div class="nav-section-title nav-toggle{% if request.resolver_match.url_name == 'finance_entries' or request.resolver_match.url_name == 'finance_reports' %} expanded{% endif %}" data-target="section-finance">
+        
+        <div class="nav-section-title nav-toggle{% if request.resolver_match.url_name == 'finance_entries' or request.resolver_match.url_name == 'finance_reports' or request.resolver_match.url_name == 'day_reports' %} expanded{% endif %}"
+            data-target="section-finance">
             <span>Finance</span>
             <i class="fas fa-chevron-down toggle-icon"></i>
         </div>
-        <div id="section-finance" class="nav-section{% if request.resolver_match.url_name != 'finance_entries' and request.resolver_match.url_name != 'finance_reports' %} collapsed{% endif %}">
-            <a href="{% url 'finance_entries' %}" class="{% if request.resolver_match.url_name == 'finance_entries' %}active{% endif %}">
+
+        <div id="section-finance"
+            class="nav-section{% if request.resolver_match.url_name != 'finance_entries' and request.resolver_match.url_name != 'finance_reports' and request.resolver_match.url_name != 'day_reports' %} collapsed{% endif %}">
+
+            <a href="{% url 'finance_entries' %}"
+            class="{% if request.resolver_match.url_name == 'finance_entries' %}active{% endif %}">
                 <i class="fas fa-money-bill"></i> Finance Entries
             </a>
-            <a href="{% url 'finance_reports' %}" class="{% if request.resolver_match.url_name == 'finance_reports' %}active{% endif %}">
+
+            <a href="{% url 'finance_reports' %}"
+            class="{% if request.resolver_match.url_name == 'finance_reports' %}active{% endif %}">
                 <i class="fas fa-chart-bar"></i> Reports
             </a>
+
+            <a href="{% url 'day_reports' %}"
+            class="{% if request.resolver_match.url_name == 'day_reports' %}active{% endif %}">
+                <i class="fas fa-calendar-day"></i> Day Report
+            </a>
+
         </div>
+
 
         <div class="nav-section-title">Admin</div>
         <div class="nav-section">

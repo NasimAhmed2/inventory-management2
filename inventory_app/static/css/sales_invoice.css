@@ -1,0 +1,352 @@
+
+/* Product suggestions dropdown */
+.sales-invoice-page .product-suggestions {
+    position: absolute;
+    z-index: 999999 !important;
+    background: #fff;
+    color: #212529;
+    width: 100%;
+    max-height: 250px;
+    overflow-y: auto;
+    border: 1px solid #dee2e6;
+    border-radius: 6px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
+}
+
+/* Keep the product input and suggestions above nearby content */
+.sales-invoice-page .product-search {
+    position: relative;
+}
+
+.sales-invoice-page .card,
+.sales-invoice-page .card-body {
+    overflow: visible !important;
+}
+/* ==========================================
+   SALES INVOICE - MODERN ERP UI
+========================================== */
+
+.sales-invoice-page {
+    --invoice-primary: #315efb;
+    --invoice-border: #e5eaf2;
+    --invoice-muted: #64748b;
+    --invoice-surface: #ffffff;
+    --invoice-background: #f5f7fb;
+
+    color: #172033;
+    padding-bottom: 24px;
+}
+
+/* Page heading */
+
+.sales-invoice-page .page-heading {
+    margin-bottom: 28px;
+}
+
+.sales-invoice-page .page-heading h4 {
+    font-size: 1.65rem;
+    font-weight: 750;
+    letter-spacing: -0.6px;
+    color: #172033;
+}
+
+.sales-invoice-page .page-heading small {
+    color: var(--invoice-muted);
+    font-size: 0.9rem;
+}
+
+/* Section cards */
+
+.sales-invoice-page .card {
+    border: 1px solid var(--invoice-border);
+    border-radius: 14px;
+    background: var(--invoice-surface);
+    box-shadow: 0 3px 12px rgba(15, 23, 42, 0.035) !important;
+    overflow: hidden;
+    margin-bottom: 24px !important;
+    overflow: hidden;
+}
+
+.sales-invoice-page .card-header {
+    background: #fff;
+    border-bottom: 1px solid #edf0f5;
+    padding: 18px 22px;
+}
+
+.sales-invoice-page .card-header h5 {
+    font-size: 1rem;
+    font-weight: 700;
+    color: #1e293b;
+    margin: 0;
+}
+
+.sales-invoice-page .card-body {
+    padding: 24px;
+}
+
+/* Form labels */
+
+.sales-invoice-page .form-label {
+    color: #334155;
+    font-size: 0.875rem;
+    font-weight: 600;
+    margin-bottom: 8px;
+}
+
+/* Inputs and selects */
+
+.sales-invoice-page .form-control,
+.sales-invoice-page .form-select {
+    min-height: 43px;
+    border: 1px solid #dbe2ec;
+    border-radius: 8px;
+    color: #1e293b;
+    background-color: #fff;
+    font-size: 0.9rem;
+    box-shadow: none;
+    transition: border-color 0.18s ease,
+                box-shadow 0.18s ease;
+}
+
+.sales-invoice-page textarea.form-control {
+    min-height: 90px;
+}
+
+.sales-invoice-page .form-control:focus,
+.sales-invoice-page .form-select:focus {
+    border-color: var(--invoice-primary);
+    box-shadow: 0 0 0 3px rgba(49, 94, 251, 0.12);
+}
+
+.sales-invoice-page .form-control[readonly] {
+    background: #f8fafc;
+}
+
+/* Buttons */
+
+.sales-invoice-page .btn {
+    border-radius: 8px;
+    font-weight: 600;
+    transition: all 0.18s ease;
+}
+
+.sales-invoice-page .btn-primary {
+    background: var(--invoice-primary);
+    border-color: var(--invoice-primary);
+}
+
+.sales-invoice-page .btn-primary:hover {
+    background: #2449d8;
+    border-color: #2449d8;
+}
+
+.sales-invoice-page .btn-success {
+    background: #16845b;
+    border-color: #16845b;
+}
+
+.sales-invoice-page .btn-success:hover {
+    background: #116b49;
+    border-color: #116b49;
+}
+
+/* Tables */
+
+.sales-invoice-page .table {
+    margin-bottom: 0;
+    color: #334155;
+    font-size: 0.88rem;
+}
+
+.sales-invoice-page .table thead th {
+    background: #f5f7fb;
+    color: #475569;
+    font-size: 0.78rem;
+    font-weight: 700;
+    letter-spacing: 0.25px;
+    text-transform: uppercase;
+    padding: 14px 12px;
+    border-bottom: 1px solid #e2e8f0;
+    white-space: nowrap;
+}
+
+.sales-invoice-page .table tbody td {
+    padding: 13px 12px;
+    vertical-align: middle;
+    border-color: #edf0f5;
+}
+
+.sales-invoice-page .table tbody tr:hover td {
+    background-color: #fafbff;
+}
+
+.sales-invoice-page .table .form-control,
+.sales-invoice-page .table .form-select {
+    min-height: 38px;
+}
+
+/* Payment details panel */
+
+.sales-invoice-page #single-payment-section,
+.sales-invoice-page #split-payment-section {
+    margin-top: 8px;
+}
+
+.sales-invoice-page .btn-check + label {
+    border: 1px solid #dbe2ec !important;
+    border-radius: 12px !important;
+    background: #fff;
+    padding: 19px !important;
+    transition: border-color 0.2s ease,
+                background-color 0.2s ease,
+                box-shadow 0.2s ease;
+}
+
+.sales-invoice-page .btn-check + label:hover {
+    border-color: #9db3ff !important;
+    background: #f9faff;
+}
+
+.sales-invoice-page .btn-check:checked + label {
+    border-color: var(--invoice-primary) !important;
+    background: #f0f4ff;
+    box-shadow: 0 0 0 2px rgba(49, 94, 251, 0.08);
+}
+
+.sales-invoice-page .btn-check:focus-visible + label {
+    outline: 3px solid rgba(49, 94, 251, 0.25);
+    outline-offset: 2px;
+}
+
+/* Payment totals */
+
+.sales-invoice-page #payment-invoice-total,
+.sales-invoice-page #payment-allocated-total {
+    font-variant-numeric: tabular-nums;
+}
+
+.sales-invoice-page #payment-remaining {
+    font-size: 1.25rem;
+    font-weight: 750;
+    font-variant-numeric: tabular-nums;
+}
+
+.sales-invoice-page #split-payment-status {
+    font-weight: 600;
+}
+
+/* Invoice summary */
+
+.sales-invoice-page #summary-section .table td {
+    padding: 15px 12px;
+}
+
+.sales-invoice-page #summary-grand-total {
+    color: var(--invoice-primary);
+    font-size: 1.7rem !important;
+    font-weight: 800;
+    font-variant-numeric: tabular-nums;
+}
+
+/* Repair information panels */
+
+.sales-invoice-page #repair-info .border {
+    border-color: var(--invoice-border) !important;
+    border-radius: 10px;
+    background: #fafbfe;
+}
+
+/* Bottom action area */
+
+.sales-invoice-page #submit-section {
+    padding: 18px 0 8px;
+    border-top: 1px solid var(--invoice-border);
+    margin-top: 8px;
+}
+
+.sales-invoice-page #generate-invoice {
+    padding: 12px 24px;
+    box-shadow: 0 4px 10px rgba(22, 132, 91, 0.14);
+}
+
+/* Responsive spacing */
+
+@media (max-width: 767px) {
+    .sales-invoice-page .card-header {
+        padding: 16px;
+    }
+
+    .sales-invoice-page .card-body {
+        padding: 17px;
+    }
+
+    .sales-invoice-page .page-heading h4 {
+        font-size: 1.35rem;
+    }
+
+    .sales-invoice-page #submit-section {
+        gap: 10px;
+    }
+
+    .sales-invoice-page #generate-invoice {
+        padding: 11px 15px;
+    }
+
+    .amount-words-panel {
+        min-height: 180px;
+        padding: 20px;
+    }
+
+    .amount-words-text {
+        font-size: 20px;
+    }
+}
+
+
+.amount-words-panel {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    padding: 28px;
+    background: linear-gradient(135deg, #f0f6ff, #f8faff);
+    border: 1px solid #dce8fb;
+    border-radius: 12px;
+    min-height: 250px;
+}
+
+.amount-words-label {
+    color: #64748b;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 1px;
+    margin-bottom: 22px;
+}
+
+.amount-words-text {
+    color: #193b70;
+    font-size: 23px;
+    font-weight: 700;
+    line-height: 1.7;
+    overflow-wrap: anywhere;
+}
+
+.amount-words-footer {
+    margin-top: 22px;
+    padding-top: 14px;
+    border-top: 1px solid #dce8fb;
+    color: #64748b;
+    font-size: 13px;
+}
+
+.invoice-summary-table td {
+    padding: 18px 12px;
+    vertical-align: middle;
+    border-bottom: 1px solid #e9eef5;
+}
+
+.invoice-summary-table .form-control {
+    border-radius: 8px;
+}
+
+
+

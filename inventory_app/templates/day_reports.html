@@ -1,0 +1,531 @@
+
+{% extends 'base.html' %}
+
+{% block title %}Day Report{% endblock %}
+
+{% block content %}
+<style>
+    .day-report {
+        color: #1e293b;
+        padding-bottom: 30px;
+    }
+
+    .report-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        flex-wrap: wrap;
+        gap: 16px;
+        margin-bottom: 26px;
+    }
+
+    .report-header h2 {
+        font-size: 27px;
+        font-weight: 750;
+        margin: 0 0 6px;
+        letter-spacing: -0.6px;
+    }
+
+    .report-subtitle {
+        color: #64748b;
+        margin: 0;
+        font-size: 14px;
+    }
+
+    .report-date {
+        background: #fff;
+        border: 1px solid #e2e8f0;
+        border-radius: 12px;
+        padding: 12px 16px;
+        color: #334155;
+        font-weight: 600;
+        box-shadow: 0 3px 12px rgba(15, 23, 42, 0.04);
+    }
+
+    .report-grid {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 16px;
+        margin-bottom: 22px;
+    }
+
+    .report-card {
+        background: #fff;
+        border: 1px solid #e8edf4;
+        border-radius: 16px;
+        padding: 21px;
+        box-shadow: 0 4px 15px rgba(15, 23, 42, 0.035);
+        min-width: 0;
+    }
+
+    .report-card-top {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 10px;
+        margin-bottom: 17px;
+    }
+
+    .report-card-label {
+        font-size: 13px;
+        font-weight: 600;
+        color: #64748b;
+    }
+
+    .report-icon {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 42px;
+        height: 42px;
+        border-radius: 12px;
+        font-size: 17px;
+        flex-shrink: 0;
+    }
+
+    .icon-sales { background: #e0f2fe; color: #0369a1; }
+    .icon-purchases { background: #f3e8ff; color: #7e22ce; }
+    .icon-collection { background: #dcfce7; color: #15803d; }
+    .icon-profit { background: #fef3c7; color: #a16207; }
+
+    .report-card-value {
+        font-size: clamp(20px, 2vw, 27px);
+        font-weight: 750;
+        letter-spacing: -0.7px;
+        line-height: 1.3;
+        overflow-wrap: anywhere;
+    }
+
+    .report-card-note {
+        margin-top: 8px;
+        color: #94a3b8;
+        font-size: 12px;
+    }
+
+    .report-section {
+        background: #fff;
+        border: 1px solid #e8edf4;
+        border-radius: 16px;
+        padding: 22px;
+        margin-bottom: 22px;
+        box-shadow: 0 4px 15px rgba(15, 23, 42, 0.035);
+        min-width: 0;
+    }
+
+    .report-section-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 12px;
+        margin-bottom: 20px;
+    }
+
+    .report-section-header h3 {
+        font-size: 17px;
+        font-weight: 750;
+        margin: 0;
+    }
+
+    .report-section-header p {
+        font-size: 13px;
+        color: #94a3b8;
+        margin: 5px 0 0;
+    }
+
+    .payment-grid {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 13px;
+    }
+
+    .payment-item {
+        border: 1px solid #e8edf4;
+        border-radius: 12px;
+        padding: 17px;
+        background: #fbfdff;
+    }
+
+    .payment-item span {
+        display: block;
+        color: #64748b;
+        font-size: 13px;
+        margin-bottom: 9px;
+    }
+
+    .payment-item strong {
+        display: block;
+        font-size: 20px;
+        font-weight: 750;
+        overflow-wrap: anywhere;
+    }
+
+    .payment-item small {
+        display: block;
+        color: #94a3b8;
+        margin-top: 6px;
+        font-size: 11px;
+    }
+
+    .profit-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 12px;
+        padding: 14px 0;
+        border-bottom: 1px solid #f1f5f9;
+    }
+
+    .profit-row:last-child {
+        border-bottom: 0;
+    }
+
+    .profit-row span {
+        color: #64748b;
+        font-size: 14px;
+    }
+
+    .profit-row strong {
+        font-size: 15px;
+        font-weight: 700;
+    }
+
+    .profit-result {
+        background: #f8fafc;
+        border-radius: 12px;
+        margin-top: 14px;
+        padding: 18px;
+    }
+
+    .profit-result span {
+        font-weight: 700;
+        color: #334155;
+    }
+
+    .profit-result strong {
+        font-size: 24px;
+    }
+
+    .positive { color: #15803d; }
+    .negative { color: #dc2626; }
+
+    .report-table-wrap {
+        width: 100%;
+        overflow-x: auto;
+    }
+
+    .report-table {
+        width: 100%;
+        border-collapse: collapse;
+        white-space: nowrap;
+        font-size: 13px;
+    }
+
+    .report-table th {
+        padding: 13px 14px;
+        background: #f8fafc;
+        color: #64748b;
+        text-align: left;
+        font-weight: 650;
+        border-bottom: 1px solid #e2e8f0;
+    }
+
+    .report-table td {
+        padding: 14px;
+        border-bottom: 1px solid #f1f5f9;
+        color: #334155;
+    }
+
+    .report-table tbody tr:last-child td {
+        border-bottom: 0;
+    }
+
+    .report-table .amount {
+        text-align: right;
+        font-weight: 700;
+    }
+
+    .report-badge {
+        display: inline-block;
+        padding: 5px 9px;
+        border-radius: 20px;
+        font-size: 11px;
+        font-weight: 700;
+        background: #e0f2fe;
+        color: #0369a1;
+    }
+
+    .report-badge.return {
+        background: #fee2e2;
+        color: #b91c1c;
+    }
+
+    .empty-report {
+        text-align: center;
+        padding: 30px 15px !important;
+        color: #94a3b8 !important;
+    }
+
+    @media (max-width: 1100px) {
+        .report-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+        .payment-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    }
+
+    @media (max-width: 576px) {
+        .report-header h2 { font-size: 23px; }
+        .report-grid { grid-template-columns: 1fr; }
+        .payment-grid { grid-template-columns: 1fr 1fr; }
+        .report-section { padding: 16px; }
+        .report-card { padding: 18px; }
+    }
+</style>
+
+<div class="day-report">
+
+    <div class="report-header">
+        <div>
+            <h2><i class="fas fa-calendar-day" style="color:#2563eb;"></i> Day Report</h2>
+            <p class="report-subtitle">
+                Your business activity, collections and estimated profit for today.
+            </p>
+        </div>
+
+        <div class="report-date">
+            <i class="far fa-calendar-alt"></i>
+            {{ today|date:"d M Y" }}
+        </div>
+    </div>
+
+    <!-- Summary cards -->
+    <div class="report-grid">
+
+        <div class="report-card">
+            <div class="report-card-top">
+                <span class="report-card-label">Today's Sales</span>
+                <div class="report-icon icon-sales">
+                    <i class="fas fa-shopping-cart"></i>
+                </div>
+            </div>
+            <div class="report-card-value">
+                ₹{{ sales_total|floatformat:2 }}
+            </div>
+            <div class="report-card-note">
+                Excludes sale returns
+            </div>
+        </div>
+
+        <div class="report-card">
+            <div class="report-card-top">
+                <span class="report-card-label">Today's Purchases</span>
+                <div class="report-icon icon-purchases">
+                    <i class="fas fa-boxes"></i>
+                </div>
+            </div>
+            <div class="report-card-value">
+                ₹{{ purchase_total|floatformat:2 }}
+            </div>
+            <div class="report-card-note">
+                Based on purchase invoice totals
+            </div>
+        </div>
+
+        <div class="report-card">
+            <div class="report-card-top">
+                <span class="report-card-label">Collections</span>
+                <div class="report-icon icon-collection">
+                    <i class="fas fa-wallet"></i>
+                </div>
+            </div>
+            <div class="report-card-value">
+                ₹{{ collection_total|floatformat:2 }}
+            </div>
+            <div class="report-card-note">
+                Cash + UPI + card received
+            </div>
+        </div>
+
+        <div class="report-card">
+            <div class="report-card-top">
+                <span class="report-card-label">Estimated Profit / Loss</span>
+                <div class="report-icon icon-profit">
+                    <i class="fas fa-chart-line"></i>
+                </div>
+            </div>
+            <div class="report-card-value {% if estimated_profit < 0 %}negative{% else %}positive{% endif %}">
+                ₹{{ estimated_profit|floatformat:2 }}
+            </div>
+            <div class="report-card-note">
+                Sales value minus estimated item cost
+            </div>
+        </div>
+
+    </div>
+
+    <!-- Collections -->
+    <div class="report-section">
+        <div class="report-section-header">
+            <div>
+                <h3><i class="fas fa-credit-card" style="color:#2563eb;"></i> Payment Summary</h3>
+                <p>Payment amounts recorded against today's sale invoices.</p>
+            </div>
+        </div>
+
+        <div class="payment-grid">
+            <div class="payment-item">
+                <span><i class="fas fa-money-bill-wave"></i> Cash Received</span>
+                <strong>₹{{ cash_total|floatformat:2 }}</strong>
+                <small>Cash collection</small>
+            </div>
+
+            <div class="payment-item">
+                <span><i class="fas fa-mobile-alt"></i> UPI Received</span>
+                <strong>₹{{ upi_total|floatformat:2 }}</strong>
+                <small>Digital collection</small>
+            </div>
+
+            <div class="payment-item">
+                <span><i class="fas fa-credit-card"></i> Card Received</span>
+                <strong>₹{{ card_total|floatformat:2 }}</strong>
+                <small>Card collection</small>
+            </div>
+
+            <div class="payment-item">
+                <span><i class="fas fa-clock"></i> Credit Amount</span>
+                <strong>₹{{ credit_total|floatformat:2 }}</strong>
+                <small>Credit recorded on today's invoices</small>
+            </div>
+        </div>
+    </div>
+
+    <!-- Profit calculation -->
+    <div class="report-section">
+        <div class="report-section-header">
+            <div>
+                <h3><i class="fas fa-calculator" style="color:#2563eb;"></i> Estimated Profit / Loss</h3>
+                <p>Calculated from today's sale line items and their current recorded stock cost.</p>
+            </div>
+        </div>
+
+        <div class="profit-row">
+            <span>Sales value (excluding returns)</span>
+            <strong>₹{{ sales_total|floatformat:2 }}</strong>
+        </div>
+
+        <div class="profit-row">
+            <span>Estimated cost of items sold</span>
+            <strong>− ₹{{ cost_total|floatformat:2 }}</strong>
+        </div>
+
+        <div class="profit-row">
+            <span>Sale returns (shown separately)</span>
+            <strong>₹{{ return_total|floatformat:2 }}</strong>
+        </div>
+
+        <div class="profit-result">
+            <div class="profit-row" style="padding:0;">
+                <span>Estimated gross profit / loss</span>
+                <strong class="{% if estimated_profit < 0 %}negative{% else %}positive{% endif %}">
+                    ₹{{ estimated_profit|floatformat:2 }}
+                </strong>
+            </div>
+        </div>
+
+        <p style="font-size:12px;color:#94a3b8;margin:14px 0 0;">
+            This estimate does not deduct operating expenses, and does not include tax or discount adjustments.
+            Item cost uses InventoryStock.last_cost; items without a stock record are costed at ₹0.
+        </p>
+    </div>
+
+    <!-- Sales invoices -->
+    <div class="report-section">
+        <div class="report-section-header">
+            <div>
+                <h3><i class="fas fa-file-invoice" style="color:#2563eb;"></i> Today's Sale Invoices</h3>
+                <p>Sales are calculated from item rate × quantity.</p>
+            </div>
+            <span class="report-badge">{{ sales_invoices|length }} invoice(s)</span>
+        </div>
+
+        <div class="report-table-wrap">
+            <table class="report-table">
+                <thead>
+                    <tr>
+                        <th>Invoice No.</th>
+                        <th>Customer</th>
+                        <th>Sale Type</th>
+                        <th>Payment Mode</th>
+                        <th class="amount">Item Value</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for invoice in sales_invoices %}
+                    <tr>
+                        <td><strong>{{ invoice.invoice_number }}</strong></td>
+                        <td>{{ invoice.customer }}</td>
+                        <td>
+                            {% if invoice.sale_type == "RETURN" %}
+                                <span class="report-badge return">Return</span>
+                            {% else %}
+                                <span class="report-badge">{{ invoice.get_sale_type_display }}</span>
+                            {% endif %}
+                        </td>
+                        <td>{{ invoice.get_payment_mode_display }}</td>
+                        <td class="amount">₹{{ invoice.report_total|floatformat:2 }}</td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="5" class="empty-report">
+                            <i class="fas fa-file-invoice fa-2x" style="display:block;margin-bottom:10px;"></i>
+                            No sale invoices found for today.
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Purchase invoices -->
+    <div class="report-section">
+        <div class="report-section-header">
+            <div>
+                <h3><i class="fas fa-truck-loading" style="color:#7e22ce;"></i> Today's Purchase Invoices</h3>
+                <p>Purchase invoices with today's invoice date.</p>
+            </div>
+            <span class="report-badge">{{ purchases|length }} invoice(s)</span>
+        </div>
+
+        <div class="report-table-wrap">
+            <table class="report-table">
+                <thead>
+                    <tr>
+                        <th>Invoice No.</th>
+                        <th>Vendor</th>
+                        <th>Invoice Date</th>
+                        <th class="amount">Invoice Total</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for purchase in purchases %}
+                    <tr>
+                        <td><strong>{{ purchase.invoice_number }}</strong></td>
+                        <td>{{ purchase.vendor }}</td>
+                        <td>{{ purchase.invoice_date|date:"d M Y" }}</td>
+                        <td class="amount">₹{{ purchase.grand_total|floatformat:2 }}</td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="4" class="empty-report">
+                            <i class="fas fa-box-open fa-2x" style="display:block;margin-bottom:10px;"></i>
+                            No purchase invoices found for today.
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+</div>
+{% endblock %}

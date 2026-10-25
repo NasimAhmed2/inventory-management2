@@ -11,17 +11,8 @@ urlpatterns = [
     path("inventory/products/categories-excel/", views.inventory_products_categories_excel, name="inventory_products_categories_excel"),
     path("inventory/products/", views.inventory_products, name="inventory_products"),
     path("inventory/products-excel/", views.inventory_products_excel, name="inventory_products_excel"),
-    path(
-        "inventory/products/update/<int:pk>/",
-        views.product_update,
-        name="product_update",
-    ),
-
-    path(
-        "inventory/products/delete/<int:pk>/",
-        views.product_delete,
-        name="product_delete",
-    ),
+    path("inventory/products/update/<int:pk>/",views.product_update,name="product_update"),
+    path("inventory/products/delete/<int:pk>/",views.product_delete,name="product_delete"),
     path("purchases/vendors/", views.purchases_vendors, name="purchases_vendors"),
     path("vendors/<int:vendor_id>/ledger/",views.vendor_ledger,name="vendor_ledger"),
     path("vendors/<int:vendor_id>/ledger/download/",views.vendor_ledger_download,name="vendor_ledger_download"),
@@ -60,111 +51,40 @@ urlpatterns = [
     path("tickets/<int:pk>/print/",views.ticket_print,name="ticket_print"),
 
     # ==========================================================
+    # Finance Reports
+    # ==========================================================
+    path("day_reports/", views.day_reports, name="day_reports"),
+
+    # ==========================================================
     # Service Reports
     # ==========================================================
-
-    path(
-        "service-reports/",
-        views.service_reports,
-        name="service_reports",
-    ),
-
-    path(
-        "service-reports/create/<int:ticket_id>/",
-        views.service_report_create,
-        name="service_report_create",
-    ),
-
-    path(
-        "service-reports/<int:pk>/edit/",
-        views.service_report_edit,
-        name="service_report_edit",
-    ),
-
-    path(
-        "service-reports/<int:pk>/",
-        views.service_report_detail,
-        name="service_report_detail",
-    ),
-
-    path(
-        "service-reports/<int:pk>/update/",
-        views.service_report_update,
-        name="service_report_update",
-    ),
-
-    path(
-        "service-reports/<int:pk>/submit/",
-        views.service_report_submit,
-        name="service_report_submit",
-    ),
-
-    path(
-        "service-reports/<int:pk>/approve/",
-        views.service_report_approve,
-        name="service_report_approve",
-    ),
-
-    path(
-        "service-reports/<int:pk>/reject/",
-        views.service_report_reject,
-        name="service_report_reject",
-    ),
-
-    path(
-        "service-reports/<int:pk>/complete/",
-        views.service_report_complete,
-        name="service_report_complete",
-    ),
+    path("service-reports/",views.service_reports,name="service_reports"),
+    path("service-reports/create/<int:ticket_id>/",views.service_report_create,name="service_report_create"),
+    path("service-reports/<int:pk>/edit/",views.service_report_edit,name="service_report_edit"),
+    path("service-reports/<int:pk>/",views.service_report_detail,name="service_report_detail"),
+    path("service-reports/<int:pk>/update/",views.service_report_update,name="service_report_update"),
+    path("service-reports/<int:pk>/submit/",views.service_report_submit,name="service_report_submit"),
+    path("service-reports/<int:pk>/approve/",views.service_report_approve,name="service_report_approve"),
+    path("service-reports/<int:pk>/reject/",views.service_report_reject,name="service_report_reject"),
+    path("service-reports/<int:pk>/complete/",views.service_report_complete,name="service_report_complete"),
 
     # ==========================================================
     # Sales Invoices
     # ==========================================================
-
-    path(
-        "sales/invoices/",
-        views.sales_invoices,
-        name="sales_invoices",
-    ),
-
-    path(
-        "sales/invoices/new/",
-        views.sales_invoice_create,
-        name="sales_invoice_create",
-    ),
-
-    path(
-        "sales/invoices/create/",
-        views.sales_invoice_create_save,
-        name="sales_invoice_create_save",
-    ),
-
-    path(
-        "sales/invoices/<int:invoice_id>/",
-        views.sales_invoice_detail,
-        name="sales_invoice_detail",
-    ),
+    path("sales/invoices/",views.sales_invoices,name="sales_invoices"),
+    path("sales/invoices/new/",views.sales_invoice_create,name="sales_invoice_create"),
+    path("sales/invoices/create/",views.sales_invoice_create_save,name="sales_invoice_create_save"),
+    path("sales/invoices/<int:invoice_id>/",views.sales_invoice_detail,name="sales_invoice_detail"),
 
     # ==========================================================
     # Service Report → Repair Invoice
     # ==========================================================
-
-    path(
-        "sales/service-report/<int:report_id>/data/",
-        views.sales_service_report_data,
-        name="sales_service_report_data",
-    ),
+    path("sales/service-report/<int:report_id>/data/",views.sales_service_report_data,name="sales_service_report_data"),
 
     # ==========================================================
     # Customer Search
     # ==========================================================
-
-    path(
-        "sales/customers/search/",
-        views.sales_customer_search,
-        name="sales_customer_search",
-    ),
-
+    path("sales/customers/search/",views.sales_customer_search,name="sales_customer_search"),
 
     # ==========================================================
     # AJAX

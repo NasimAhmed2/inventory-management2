@@ -1,17 +1,20 @@
 {% extends "base.html" %}
 {% load static %}
-
+{% block extra_css %}
+    <link rel="stylesheet" href="{% static 'css/sales_invoice.css' %}">
+{% endblock %}
 {% block title %}New Sale{% endblock %}
 
 {% block content %}
 
-<div class="container-fluid">
+<div class="container-fluid sales-invoice-page">
 
     <!-- ===================================================== -->
     <!-- PAGE HEADER -->
     <!-- ===================================================== -->
 
-    <div class="d-flex justify-content-between align-items-center mb-4">
+    <div class="page-heading d-flex justify-content-between
+            align-items-center flex-wrap gap-3">
 
         <div>
             <h4 class="mb-1">
@@ -185,45 +188,6 @@
             </div>
 
         </div>
-
-        <!-- ================================================= -->
-        <!-- Payment Mode -->
-        <!-- ================================================= -->
-
-        <div class="col-md-4">
-
-            <label class="form-label">
-                Mode of Payment
-                <span class="text-danger">*</span>
-            </label>
-
-            <select
-                name="payment_mode"
-                id="payment-mode"
-                class="form-select"
-                required
-            >
-
-                <option value="cash" selected>
-                    Cash
-                </option>
-
-                <option value="upi">
-                    UPI
-                </option>
-
-                <option value="card">
-                    Card
-                </option>
-
-                <option value="credit">
-                    Credit
-                </option>
-
-            </select>
-
-        </div>
-
 
 
         <!-- ================================================= -->
@@ -416,9 +380,9 @@
                         <thead class="table-light">
                             <tr>
                                 <th width="260">Product</th>
-                                <th width="180">Item Code</th>
+                                <th width="150">Item Code</th>
                                 <th>Item Name</th>
-                                <th width="50">Qty</th>
+                                <th width="80">Qty</th>
                                 <th width="130">Rate</th>
                                 <th width="100">Tax %</th>
                                 <th width="130">Tax</th>
@@ -588,6 +552,7 @@
 
 
 
+        
         <!-- ================================================= -->
         <!-- INVOICE SUMMARY -->
         <!-- ================================================= -->
@@ -599,64 +564,35 @@
         >
 
             <div class="card-header">
-
-                <h5 class="mb-0">
-                    Invoice Summary
-                </h5>
-
+                <h5 class="mb-0">Invoice Summary</h5>
             </div>
-
 
             <div class="card-body">
 
-                <div class="row justify-content-end">
+                <div class="row g-4 align-items-stretch">
 
-                    <div class="col-md-5">
+                    <!-- LEFT: Existing Invoice Summary -->
+                    <div class="col-lg-6">
 
-                        <table class="table">
+                        <table class="table invoice-summary-table mb-0">
 
                             <tr>
-
-                                <td>
-                                    Total Amount
-                                </td>
-
+                                <td>Total Amount</td>
                                 <td class="text-end">
-
-                                    <strong id="summary-total">
-                                        0.00
-                                    </strong>
-
+                                    <strong id="summary-total">0.00</strong>
                                 </td>
-
                             </tr>
 
-
                             <tr>
-
-                                <td>
-                                    Tax
-                                </td>
-
+                                <td>Tax</td>
                                 <td class="text-end">
-
-                                    <strong id="summary-tax">
-                                        0.00
-                                    </strong>
-
+                                    <strong id="summary-tax">0.00</strong>
                                 </td>
-
                             </tr>
 
-
                             <tr>
-
+                                <td>Discount</td>
                                 <td>
-                                    Discount
-                                </td>
-
-                                <td>
-
                                     <input
                                         type="number"
                                         step="0.01"
@@ -666,43 +602,55 @@
                                         class="form-control text-end"
                                         value="0"
                                     >
-
                                 </td>
-
                             </tr>
 
-
                             <tr class="table-primary fw-bold">
-
-                                <td>
-                                    Net Amount
-                                </td>
-
+                                <td>Net Amount</td>
                                 <td class="text-end">
-
                                     <span
                                         id="summary-grand-total"
                                         class="fs-5"
-                                    >
-                                        0.00
-                                    </span>
-
+                                    >0.00</span>
                                 </td>
-
                             </tr>
 
                         </table>
 
                     </div>
 
+                    <!-- RIGHT: Amount in Words -->
+                    <div class="col-lg-6">
+
+                        <div class="amount-words-panel h-100">
+
+                            <div class="amount-words-label">
+                                <i class="fas fa-file-invoice-dollar me-2"></i>
+                                AMOUNT CHARGEABLE (IN WORDS)
+                            </div>
+
+                            <div
+                                id="amount-in-words"
+                                class="amount-words-text"
+                            >
+                                Zero Rupees Only
+                            </div>
+
+                            <div class="amount-words-footer">
+                                <i class="fas fa-check-circle me-1"></i>
+                                Indian Rupees (INR)
+                            </div>
+
+                        </div>
+
+                    </div>
+
                 </div>
 
+                <!-- Invoice Remarks -->
+                <div class="row mt-4">
 
-                <!-- Notes -->
-
-                <div class="row">
-
-                    <div class="col-md-8">
+                    <div class="col-12">
 
                         <label class="form-label">
                             Invoice Remarks
@@ -724,6 +672,255 @@
         </div>
 
 
+        <!-- Payment Method -->
+        <div class="col-12">
+            <div class="border rounded-3 p-3 p-md-4">
+
+                <div class="d-flex align-items-center mb-3">
+                    <div class="rounded-3 bg-primary-subtle text-primary p-2 me-3">
+                        <i class="fas fa-wallet fa-lg"></i>
+                    </div>
+                    <div>
+                        <h5 class="mb-1">Payment Details</h5>
+                        <small class="text-muted">
+                            Choose how the customer will pay this invoice.
+                        </small>
+                    </div>
+                </div>
+
+                <!-- Payment type -->
+                <div class="row g-3 mb-4">
+
+                    <div class="col-md-6">
+                        <input type="radio"
+                            class="btn-check"
+                            name="payment_type"
+                            id="payment-single"
+                            value="single"
+                            checked>
+
+                        <label class="border rounded-3 p-3 w-100 h-100"
+                            for="payment-single"
+                            style="cursor:pointer">
+
+                            <div class="d-flex align-items-center">
+                                <i class="fas fa-money-bill-wave text-success fa-lg me-3"></i>
+                                <div>
+                                    <div class="fw-semibold">Single Payment</div>
+                                    <small class="text-muted">
+                                        Customer pays using one method.
+                                    </small>
+                                </div>
+                            </div>
+                        </label>
+                    </div>
+
+                    <div class="col-md-6">
+                        <input type="radio"
+                            class="btn-check"
+                            name="payment_type"
+                            id="payment-split"
+                            value="split">
+
+                        <label class="border rounded-3 p-3 w-100 h-100"
+                            for="payment-split"
+                            style="cursor:pointer">
+
+                            <div class="d-flex align-items-center">
+                                <i class="fas fa-code-branch text-primary fa-lg me-3"></i>
+                                <div>
+                                    <div class="fw-semibold">Split Payment</div>
+                                    <small class="text-muted">
+                                        Customer pays using multiple methods.
+                                    </small>
+                                </div>
+                            </div>
+                        </label>
+                    </div>
+
+                </div>
+
+                <!-- Single payment -->
+                <div id="single-payment-section">
+
+                    <div class="row g-3">
+
+                        <div class="col-md-6">
+                            <label for="payment-mode" class="form-label fw-semibold">
+                                Payment Method <span class="text-danger">*</span>
+                            </label>
+
+                            <select name="payment_mode"
+                                    id="payment-mode"
+                                    class="form-select"
+                                    required>
+
+                                <option value="cash" selected>Cash</option>
+                                <option value="upi">UPI</option>
+                                <option value="card">Card</option>
+                                <option value="credit">Credit</option>
+
+                            </select>
+                        </div>
+
+                        <div class="col-md-6 d-none" id="single-due-date-section">
+                            <label for="single-due-date" class="form-label fw-semibold">
+                                Payment Due Date <span class="text-danger">*</span>
+                            </label>
+
+                            <input type="date"
+                                class="form-control"
+                                id="single-due-date"
+                                name="due_date_single">
+
+                            <small class="text-muted">
+                                When is the outstanding amount due?
+                            </small>
+                        </div>
+
+                    </div>
+
+                </div>
+
+                <!-- Split payment -->
+                <div id="split-payment-section" class="d-none">
+
+                    <div class="alert alert-light border small">
+                        Enter the amount received through each method.
+                        Any unpaid balance can be recorded as credit.
+                    </div>
+
+                    <div class="table-responsive">
+                        <table class="table align-middle">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Payment Method</th>
+                                    <th style="width: 220px">Amount (₹)</th>
+                                </tr>
+                            </thead>
+
+                            <tbody>
+                                <tr>
+                                    <td>
+                                        <i class="fas fa-money-bill-wave text-success me-2"></i>
+                                        Cash
+                                    </td>
+                                    <td>
+                                        <input type="number"
+                                            class="form-control split-payment-amount"
+                                            name="split_cash"
+                                            id="split-cash"
+                                            min="0"
+                                            step="0.01"
+                                            value="0">
+                                    </td>
+                                </tr>
+
+                                <tr>
+                                    <td>
+                                        <i class="fas fa-mobile-alt text-primary me-2"></i>
+                                        UPI
+                                    </td>
+                                    <td>
+                                        <input type="number"
+                                            class="form-control split-payment-amount"
+                                            name="split_upi"
+                                            id="split-upi"
+                                            min="0"
+                                            step="0.01"
+                                            value="0">
+                                    </td>
+                                </tr>
+
+                                <tr>
+                                    <td>
+                                        <i class="fas fa-credit-card text-info me-2"></i>
+                                        Card
+                                    </td>
+                                    <td>
+                                        <input type="number"
+                                            class="form-control split-payment-amount"
+                                            name="split_card"
+                                            id="split-card"
+                                            min="0"
+                                            step="0.01"
+                                            value="0">
+                                    </td>
+                                </tr>
+
+                                <tr>
+                                    <td>
+                                        <i class="fas fa-clock text-warning me-2"></i>
+                                        Credit / Unpaid
+                                    </td>
+                                    <td>
+                                        <input type="number"
+                                            class="form-control split-payment-amount"
+                                            name="split_credit"
+                                            id="split-credit"
+                                            min="0"
+                                            step="0.01"
+                                            value="0">
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <!-- Payment summary -->
+                    <div class="row g-3 mt-1">
+
+                        <div class="col-md-4">
+                            <div class="bg-light rounded-3 p-3">
+                                <small class="text-muted">Invoice Total</small>
+                                <div class="fs-5 fw-semibold">
+                                    ₹<span id="payment-invoice-total">0.00</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="col-md-4">
+                            <div class="bg-light rounded-3 p-3">
+                                <small class="text-muted">Amount Allocated</small>
+                                <div class="fs-5 fw-semibold">
+                                    ₹<span id="payment-allocated-total">0.00</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="col-md-4">
+                            <div class="bg-light rounded-3 p-3">
+                                <small class="text-muted">Remaining to Allocate</small>
+                                <div class="fs-5 fw-semibold" id="payment-remaining">
+                                    ₹0.00
+                                </div>
+                            </div>
+                        </div>
+
+                    </div>
+
+                    <div class="mt-3 d-none" id="split-due-date-section">
+                        <label for="split-due-date" class="form-label fw-semibold">
+                            Credit Due Date <span class="text-danger">*</span>
+                        </label>
+
+                        <input type="date"
+                            class="form-control"
+                            style="max-width: 320px"
+                            id="split-due-date"
+                            name="due_date_split">
+
+                        <small class="text-muted">
+                            Required because part of this invoice remains unpaid.
+                        </small>
+                    </div>
+
+                    <div id="split-payment-status" class="small mt-3"></div>
+
+                </div>
+
+            </div>
+        </div>
 
         <!-- ================================================= -->
         <!-- SUBMIT -->
@@ -789,5 +986,341 @@
 {% block extra_js %}
 
 <script src="{% static 'js/sales_invoice.js' %}"></script>
+
+<script>
+    document.addEventListener("DOMContentLoaded", function () {
+
+        const singleRadio = document.getElementById("payment-single");
+    const splitRadio = document.getElementById("payment-split");
+
+    const singleSection = document.getElementById("single-payment-section");
+    const splitSection = document.getElementById("split-payment-section");
+
+    const paymentMode = document.getElementById("payment-mode");
+
+    const singleDueSection = document.getElementById("single-due-date-section");
+    const singleDueDate = document.getElementById("single-due-date");
+
+    const splitDueSection = document.getElementById("split-due-date-section");
+    const splitDueDate = document.getElementById("split-due-date");
+
+    const splitAmounts = document.querySelectorAll(".split-payment-amount");
+
+    const invoiceTotalDisplay = document.getElementById("payment-invoice-total");
+    const allocatedDisplay = document.getElementById("payment-allocated-total");
+    const remainingDisplay = document.getElementById("payment-remaining");
+    const statusDisplay = document.getElementById("split-payment-status");
+
+
+    // Read the current invoice total from your existing invoice UI.
+    // Change this selector if your grand total element uses another ID.
+    function getInvoiceTotal() {
+
+        const totalElement = document.getElementById("summary-grand-total");
+
+        if (!totalElement) {
+            return 0;
+        }
+
+        const rawValue = totalElement.textContent
+            .replace(/,/g, "")
+            .replace(/[^\d.-]/g, "");
+
+        const total = parseFloat(rawValue);
+
+        return Number.isFinite(total) ? total : 0;
+    }
+
+
+    function updateDueDate() {
+
+        const isSingle = singleRadio.checked;
+        const isSingleCredit = isSingle && paymentMode.value === "credit";
+
+        const creditAmount = Number(
+            document.getElementById("split-credit").value
+        ) || 0;
+
+        const isSplitCredit = !isSingle && creditAmount > 0;
+
+        singleDueSection.classList.toggle("d-none", !isSingleCredit);
+        singleDueDate.required = isSingleCredit;
+
+        splitDueSection.classList.toggle("d-none", !isSplitCredit);
+        splitDueDate.required = isSplitCredit;
+    }
+
+
+    function updatePaymentSummary() {
+
+        const invoiceTotal = getInvoiceTotal();
+
+        let allocated = 0;
+
+        splitAmounts.forEach(function (input) {
+            const amount = Number(input.value);
+
+            if (Number.isFinite(amount) && amount > 0) {
+                allocated += amount;
+            }
+        });
+
+        const remaining = invoiceTotal - allocated;
+
+        invoiceTotalDisplay.textContent = invoiceTotal.toFixed(2);
+        allocatedDisplay.textContent = allocated.toFixed(2);
+        remainingDisplay.textContent = remaining.toFixed(2);
+
+        remainingDisplay.classList.remove(
+            "text-success",
+            "text-danger",
+            "text-warning"
+        );
+
+        statusDisplay.textContent = "";
+        statusDisplay.className = "small mt-3";
+
+        if (remaining < -0.005) {
+
+            remainingDisplay.classList.add("text-danger");
+            statusDisplay.textContent =
+                "Allocated amounts exceed the invoice total.";
+            statusDisplay.classList.add("text-danger");
+
+        } else if (remaining > 0.005) {
+
+            remainingDisplay.classList.add("text-warning");
+            statusDisplay.textContent =
+                "There is still an amount to allocate.";
+            statusDisplay.classList.add("text-warning");
+
+        } else {
+
+            remainingDisplay.classList.add("text-success");
+            statusDisplay.textContent =
+                "Payment allocation matches the invoice total.";
+            statusDisplay.classList.add("text-success");
+        }
+
+        updateDueDate();
+    }
+
+
+    function updatePaymentType() {
+
+        const isSingle = singleRadio.checked;
+
+        singleSection.classList.toggle("d-none", !isSingle);
+        splitSection.classList.toggle("d-none", isSingle);
+
+        paymentMode.disabled = !isSingle;
+
+        // Disable hidden payment inputs so they are not submitted.
+        splitAmounts.forEach(function (input) {
+            input.disabled = isSingle;
+        });
+
+        singleDueDate.disabled = !isSingle;
+        splitDueDate.disabled = isSingle;
+
+        updatePaymentSummary();
+    }
+
+
+    singleRadio.addEventListener("change", updatePaymentType);
+    splitRadio.addEventListener("change", updatePaymentType);
+
+    paymentMode.addEventListener("change", updateDueDate);
+
+    splitAmounts.forEach(function (input) {
+        input.addEventListener("input", updatePaymentSummary);
+    });
+
+
+    // Validate split allocations before submitting the invoice.
+    const paymentContainer = document.querySelector(
+        "#single-payment-section"
+    );
+
+    const invoiceForm = paymentContainer
+        ? paymentContainer.closest("form")
+        : null;
+
+    if (invoiceForm) {
+
+        invoiceForm.addEventListener("submit", function (event) {
+
+            if (singleRadio.checked) {
+                return;
+            }
+
+            const invoiceTotal = getInvoiceTotal();
+
+            const allocated = Array.from(splitAmounts).reduce(
+                function (sum, input) {
+                    return sum + (Number(input.value) || 0);
+                },
+                0
+            );
+
+            const hasInvalidAmount = Array.from(splitAmounts).some(
+                function (input) {
+                    const amount = Number(input.value);
+
+                    return (
+                        input.value.trim() === "" ||
+                        !Number.isFinite(amount) ||
+                        amount < 0
+                    );
+                }
+            );
+
+            if (hasInvalidAmount) {
+                event.preventDefault();
+                alert("Please enter valid, non-negative amounts for all payment methods.");
+                return;
+            }
+
+            if (Math.abs(allocated - invoiceTotal) > 0.005) {
+                event.preventDefault();
+                alert("Payment amounts must add up to the invoice total.");
+                return;
+            }
+
+            if (
+                Number(document.getElementById("split-credit").value) > 0 &&
+                !splitDueDate.value
+            ) {
+                event.preventDefault();
+                alert("Please select a due date for the credit amount.");
+            }
+        });
+    }
+
+
+    // Refresh totals when the existing invoice total changes dynamically.
+    const totalElement = document.querySelector(
+        "#grand-total, #grandTotal, #grand_total, #total_amount"
+    );
+
+    if (totalElement) {
+
+        new MutationObserver(updatePaymentSummary).observe(
+            totalElement,
+            {
+                childList: true,
+                characterData: true,
+                subtree: true
+            }
+        );
+
+        totalElement.addEventListener("input", updatePaymentSummary);
+        totalElement.addEventListener("change", updatePaymentSummary);
+    }
+
+    
+
+    updatePaymentType();
+
+    });
+</script>
+
+<script>
+    
+    function numberToIndianWords(number) {
+        const ones = [
+            "Zero", "One", "Two", "Three", "Four",
+            "Five", "Six", "Seven", "Eight", "Nine",
+            "Ten", "Eleven", "Twelve", "Thirteen",
+            "Fourteen", "Fifteen", "Sixteen",
+            "Seventeen", "Eighteen", "Nineteen"
+        ];
+
+        const tens = [
+            "", "", "Twenty", "Thirty", "Forty",
+            "Fifty", "Sixty", "Seventy", "Eighty", "Ninety"
+        ];
+
+        function belowThousand(n) {
+            const words = [];
+
+            if (n >= 100) {
+                words.push(ones[Math.floor(n / 100)], "Hundred");
+                n %= 100;
+            }
+
+            if (n >= 20) {
+                words.push(tens[Math.floor(n / 10)]);
+                n %= 10;
+            }
+
+            if (n > 0) words.push(ones[n]);
+
+            return words.join(" ");
+        }
+
+        if (number === 0) return "Zero";
+
+        const groups = [
+            [10000000, "Crore"],
+            [100000, "Lakh"],
+            [1000, "Thousand"]
+        ];
+
+        const words = [];
+
+        for (const [value, name] of groups) {
+            if (number >= value) {
+                const count = Math.floor(number / value);
+                words.push(belowThousand(count), name);
+                number %= value;
+            }
+        }
+
+        if (number > 0) words.push(belowThousand(number));
+
+        return words.join(" ");
+    }
+
+    function updateAmountInWords() {
+        const totalElement = document.getElementById("summary-grand-total");
+        const wordsElement = document.getElementById("amount-in-words");
+
+        if (!totalElement || !wordsElement) return;
+
+        const amount = Number(
+            totalElement.textContent.replace(/,/g, "").trim()
+        );
+
+        if (!Number.isFinite(amount) || amount < 0) return;
+
+        const [rupeesText, paiseText] = amount.toFixed(2).split(".");
+        const rupees = Number(rupeesText);
+        const paise = Number(paiseText);
+
+        let words = numberToIndianWords(rupees) + " Rupees";
+
+        if (paise > 0) {
+            words += " and " + numberToIndianWords(paise) + " Paise";
+        }
+
+        wordsElement.textContent = words + " Only";
+    }
+
+    document.addEventListener("DOMContentLoaded", function () {
+        const totalElement = document.getElementById("summary-grand-total");
+
+        if (!totalElement) return;
+
+        new MutationObserver(updateAmountInWords).observe(totalElement, {
+            childList: true,
+            characterData: true,
+            subtree: true
+        });
+
+        updateAmountInWords();
+    });
+
+</script>
 
 {% endblock %}
