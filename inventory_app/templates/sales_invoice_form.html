@@ -172,12 +172,28 @@
                             Customer Mobile
                         </label>
 
-                        <input
-                            type="text"
-                            id="customer-mobile"
-                            class="form-control"
-                            readonly
-                        >
+                        <div class="input-group">
+
+                            <input
+                                type="text"
+                                id="customer-mobile"
+                                class="form-control"
+                                readonly
+                            >
+
+                            <button
+                                type="button"
+                                class="btn btn-success"
+                                data-bs-toggle="modal"
+                                data-bs-target="#customerModal"
+                                id="btnAddCustomer">
+
+                                <i class="fas fa-plus"></i>
+                                Add Customer
+
+                            </button>
+
+                        </div>
 
                     </div>
 
@@ -954,6 +970,215 @@
 
 </div>
 
+<!-- Customer Modal -->
+
+<div class="modal fade" id="customerModal">
+
+    <div class="modal-dialog modal-lg">
+
+        <div class="modal-content">
+
+            <form
+                method="post"
+                id="customerForm"
+                action="{% url 'sales_customers_create' %}"
+            >
+
+                {% csrf_token %}
+
+                <input
+                    type="hidden"
+                    name="customer_id"
+                    id="customer_id"
+                >
+
+                <div class="modal-header">
+
+                    <h5 id="customerModalTitle">
+
+                        Add Customer
+
+                    </h5>
+
+                    <button
+                        type="button"
+                        class="btn-close"
+                        data-bs-dismiss="modal"
+                    ></button>
+
+                </div>
+
+                <div class="modal-body">
+
+                    <div class="row">
+
+                        <div class="col-md-6">
+
+                            <label>Customer Code</label>
+
+                            <input
+                                class="form-control"
+                                name="customer_code"
+                                id="customer_code"
+                                required
+                                readonly
+                            >
+
+                        </div>
+
+                        <div class="col-md-6">
+
+                            <label>Customer Type</label>
+
+                            <select
+                                class="form-select"
+                                name="customer_type"
+                                id="customer_type"
+                            >
+                                <option value="consumer">Consumer</option>
+                                <option value="retailer">Retailer</option>
+                                <option value="wholesaler">Wholesaler</option>
+                            </select>
+
+                        </div>
+
+                        <div class="col-md-6">
+
+                            <label>Name</label>
+
+                            <input
+                                class="form-control"
+                                name="name"
+                                id="name"
+                                required
+                            >
+
+                        </div>
+
+                        <div class="col-md-6">
+
+                            <label>Mobile</label>
+
+                            <input
+                                class="form-control"
+                                name="mobile"
+                                id="mobile"
+                            >
+
+                        </div>
+
+                    </div>
+
+                    <div class="row mt-3">
+
+                        <div class="col-md-6">
+
+                            <label>Email</label>
+
+                            <input
+                                type="email"
+                                class="form-control"
+                                name="email"
+                                id="email"
+                            >
+
+                        </div>
+
+                        <div class="col-md-6">
+
+                            <label>VAT Number</label>
+
+                            <input
+                                class="form-control"
+                                name="vat_number"
+                                id="vat_number"
+                            >
+
+                        </div>
+
+                    </div>
+
+                    <div class="mt-3">
+
+                        <label>Address</label>
+
+                        <textarea
+                            class="form-control"
+                            rows="3"
+                            name="address"
+                            id="address"
+                        ></textarea>
+
+                    </div>
+
+                    <div class="row mt-3">
+
+                        <div class="col-md-6">
+
+                            <label>Payment Type</label>
+
+                            <select
+                                class="form-select"
+                                name="payment_type"
+                                id="payment_type"
+                            >
+
+                                <option value="cash">Cash</option>
+
+                                <option value="credit">Credit</option>
+
+                            </select>
+
+                        </div>
+
+                        <div class="col-md-6">
+
+                            <label>Credit Limit</label>
+
+                            <input
+                                type="number"
+                                class="form-control"
+                                name="credit_limit"
+                                id="credit_limit"
+                                value="0"
+                            >
+
+                        </div>
+
+                    </div>
+
+                </div>
+
+                <div class="modal-footer">
+
+                    <button
+                        type="button"
+                        class="btn btn-secondary"
+                        data-bs-dismiss="modal"
+                    >
+
+                        Cancel
+
+                    </button>
+
+                    <button
+                        class="btn btn-success"
+                    >
+
+                        Save Customer
+
+                    </button>
+
+                </div>
+
+            </form>
+
+        </div>
+
+    </div>
+
+</div>
+
 
 <!-- ========================================================= -->
 <!-- PRODUCT DATA -->
@@ -987,10 +1212,178 @@
 
 <script src="{% static 'js/sales_invoice.js' %}"></script>
 
+
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+
+    const customerSelect = document.getElementById("customer");
+    const customerMobileDisplay = document.getElementById("customer-mobile");
+
+    const modalElement = document.getElementById("customerModal");
+    const customerModal = new bootstrap.Modal(modalElement);
+
+    const customerForm = document.getElementById("customerForm");
+    const addCustomerButton = document.getElementById("btnAddCustomer");
+
+    const customerId = document.getElementById("customer_id");
+    const customerCode = document.getElementById("customer_code");
+    const customerName = document.getElementById("name");
+    const customerMobileInput = document.getElementById("mobile");
+    const customerModalTitle = document.getElementById("customerModalTitle");
+
+    const saveButton = customerForm.querySelector(
+        'button[type="submit"], button:not([type])'
+    );
+
+    // Open modal for adding a new customer
+    addCustomerButton.addEventListener("click", function () {
+
+        customerForm.reset();
+
+        customerId.value = "";
+        customerCode.value = "";
+        customerModalTitle.innerText = "Add Customer";
+
+        customerModal.show();
+    });
+
+    // Generate customer code from name and mobile
+    function generateCustomerCode() {
+
+        const name = customerName.value.trim();
+        const mobile = customerMobileInput.value.replace(/\D/g, "");
+
+        const namePart = name
+            .replace(/[^a-zA-Z]/g, "")
+            .substring(0, 4)
+            .toUpperCase();
+
+        const mobilePart = mobile.slice(-4);
+
+        customerCode.value = namePart + mobilePart;
+    }
+
+    customerName.addEventListener("input", generateCustomerCode);
+    customerMobileInput.addEventListener("input", generateCustomerCode);
+
+    // Update mobile when selecting an existing customer
+    customerSelect.addEventListener("change", function () {
+
+        const selectedOption =
+            customerSelect.options[customerSelect.selectedIndex];
+
+        customerMobileDisplay.value =
+            selectedOption?.dataset.mobile || "";
+    });
+
+    // Save new customer without leaving the sale page
+    customerForm.addEventListener("submit", async function (event) {
+
+        event.preventDefault();
+
+        if (saveButton) {
+            saveButton.disabled = true;
+            saveButton.textContent = "Saving...";
+        }
+
+        try {
+
+            const response = await fetch(customerForm.action, {
+                method: "POST",
+                body: new FormData(customerForm),
+                headers: {
+                    "X-Requested-With": "XMLHttpRequest"
+                }
+            });
+
+            const data = await response.json();
+
+            if (!response.ok || !data.success) {
+                alert(data.message || "Unable to save customer.");
+                return;
+            }
+
+            const customer = data.customer;
+
+            // Add customer to dropdown, or reuse if already present
+            let option = Array.from(customerSelect.options).find(
+                item => item.value === String(customer.id)
+            );
+
+            if (!option) {
+                option = new Option("", customer.id);
+                customerSelect.add(option);
+            }
+
+            option.value = customer.id;
+
+            option.textContent =
+                customer.customer_code + " - " +
+                customer.name +
+                (customer.mobile ? " (" + customer.mobile + ")" : "");
+
+            option.dataset.mobile = customer.mobile || "";
+
+            // Select newly created customer
+            customerSelect.value = String(customer.id);
+
+            // Fill customer mobile
+            customerMobileDisplay.value = customer.mobile || "";
+
+            // Close modal and reset for next use
+            customerModal.hide();
+
+            alert(data.message || "Customer created successfully.");
+
+        } catch (error) {
+
+            console.error("Customer save error:", error);
+
+            alert("Something went wrong while saving the customer.");
+
+        } finally {
+
+            if (saveButton) {
+                saveButton.disabled = false;
+                saveButton.textContent = "Save Customer";
+            }
+        }
+    });
+
+    // Retain edit-customer support if edit buttons exist on this page
+    document.querySelectorAll(".editCustomer").forEach(function (button) {
+
+        button.addEventListener("click", function () {
+
+            customerModalTitle.innerText = "Edit Customer";
+
+            customerId.value = this.dataset.id;
+            customerCode.value = this.dataset.code;
+            document.getElementById("customer_type").value =
+                this.dataset.type;
+
+            customerName.value = this.dataset.name;
+            customerMobileInput.value = this.dataset.mobile;
+            document.getElementById("email").value = this.dataset.email;
+            document.getElementById("address").value = this.dataset.address;
+            document.getElementById("vat_number").value = this.dataset.vat;
+            document.getElementById("payment_type").value =
+                this.dataset.payment;
+            document.getElementById("credit_limit").value =
+                this.dataset.credit;
+
+            customerModal.show();
+        });
+    });
+
+});
+</script>
+
+
 <script>
     document.addEventListener("DOMContentLoaded", function () {
 
-        const singleRadio = document.getElementById("payment-single");
+    const singleRadio = document.getElementById("payment-single");
     const splitRadio = document.getElementById("payment-split");
 
     const singleSection = document.getElementById("single-payment-section");

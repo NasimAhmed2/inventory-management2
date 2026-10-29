@@ -14,6 +14,7 @@ urlpatterns = [
     path("inventory/products/update/<int:pk>/",views.product_update,name="product_update"),
     path("inventory/products/delete/<int:pk>/",views.product_delete,name="product_delete"),
     path("purchases/vendors/", views.purchases_vendors, name="purchases_vendors"),
+    path("purchases/vendors/excel/", views.purchases_vendors_excel, name="purchases_vendors_excel"),
     path("vendors/<int:vendor_id>/ledger/",views.vendor_ledger,name="vendor_ledger"),
     path("vendors/<int:vendor_id>/ledger/download/",views.vendor_ledger_download,name="vendor_ledger_download"),
     path("vendors/<int:vendor_id>/ledger/email/",views.vendor_ledger_email,name="vendor_ledger_email"),
@@ -28,6 +29,7 @@ urlpatterns = [
     # Customers and Sales
     # ==========================================================
     path("sales/customers/", views.sales_customers, name="sales_customers"),
+    path("sales/customers/create/", views.sales_customers_create, name="sales_customers_create"),
     path("sales/customers-excel/", views.sales_customers_excel, name="sales_customers_excel"),
     path("customers/delete/<int:pk>/", views.customer_delete, name="customer_delete"),
 

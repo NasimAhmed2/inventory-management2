@@ -14,7 +14,7 @@ from django.http import FileResponse, Http404
 from django.core.paginator import Paginator
 from .models import Product, InventoryStock, InventoryMovement
 from django.utils import timezone
-from django.db import transaction
+from django.db import transaction, IntegrityError
 from django.db.models import F
 import xlrd
 from .models import (
@@ -193,6 +193,10 @@ def sales_customers(request):
 
     if request.method == "POST":
 
+        ajax_request = (
+            request.headers.get("X-Requested-With") == "XMLHttpRequest"
+        )
+
         try:
             with transaction.atomic():
 
@@ -205,10 +209,9 @@ def sales_customers(request):
                         request=request,
                     )
 
-                    messages.success(
-                        request,
-                        "Customer updated successfully."
-                    )
+                    customer = Customer.objects.get(pk=customer_id)
+
+                    message = "Customer updated successfully."
 
                 else:
 
@@ -232,6 +235,19 @@ def sales_customers(request):
 
                     if existing_customer:
 
+                        if ajax_request:
+                            return JsonResponse(
+                                {
+                                    "success": False,
+                                    "message": (
+                                        "Customer already exists: "
+                                        f"{existing_customer.customer_code} - "
+                                        f"{existing_customer.name}"
+                                    ),
+                                },
+                                status=409,
+                            )
+
                         messages.warning(
                             request,
                             (
@@ -242,24 +258,52 @@ def sales_customers(request):
                             )
                         )
 
-                    else:
+                        return redirect("sales_customers")
 
-                        CustomerService.create_customer(
-                            request=request,
+                    CustomerService.create_customer(request=request)
+
+                    customer = Customer.objects.filter(
+                        customer_code__iexact=customer_code,
+                        name__iexact=name,
+                        mobile=mobile,
+                    ).first()
+
+                    if not customer:
+                        raise Exception(
+                            "Customer was not found after creation."
                         )
 
-                        messages.success(
-                            request,
-                            "Customer created successfully."
-                        )
+                    message = "Customer created successfully."
+
+            if ajax_request:
+                return JsonResponse({
+                    "success": True,
+                    "message": message,
+                    "customer": {
+                        "id": customer.id,
+                        "customer_code": customer.customer_code,
+                        "name": customer.name,
+                        "mobile": customer.mobile or "",
+                    },
+                })
+
+            messages.success(request, message)
 
         except Exception as e:
+
+            if ajax_request:
+                return JsonResponse(
+                    {
+                        "success": False,
+                        "message": str(e),
+                    },
+                    status=400,
+                )
 
             messages.error(request, str(e))
 
         return redirect("sales_customers")
 
-    # Pagination: 20 customers per page
     paginator = Paginator(customers, 20)
 
     page_number = request.GET.get("page")
@@ -271,6 +315,72 @@ def sales_customers(request):
     }
 
     return render(request, "customers.html", context)
+
+@require_POST
+def sales_customers_create(request):
+
+    try:
+        with transaction.atomic():
+
+            customer_code = request.POST.get(
+                "customer_code", ""
+            ).strip()
+
+            name = request.POST.get(
+                "name", ""
+            ).strip()
+
+            mobile = request.POST.get(
+                "mobile", ""
+            ).strip()
+
+            if not name:
+                return JsonResponse({
+                    "success": False,
+                    "message": "Customer name is required."
+                }, status=400)
+
+            existing_customer = Customer.objects.filter(
+                customer_code__iexact=customer_code,
+                name__iexact=name,
+                mobile=mobile,
+            ).first()
+
+            if existing_customer:
+                return JsonResponse({
+                    "success": False,
+                    "message": "This customer already exists."
+                }, status=409)
+
+            CustomerService.create_customer(request=request)
+
+            customer = Customer.objects.filter(
+                customer_code__iexact=customer_code,
+                name__iexact=name,
+                mobile=mobile,
+            ).first()
+
+            if not customer:
+                raise Exception(
+                    "Customer was not found after creation."
+                )
+
+            return JsonResponse({
+                "success": True,
+                "message": "Customer created successfully.",
+                "customer": {
+                    "id": customer.id,
+                    "customer_code": customer.customer_code,
+                    "name": customer.name,
+                    "mobile": customer.mobile or "",
+                }
+            })
+
+    except Exception as e:
+        return JsonResponse({
+            "success": False,
+            "message": str(e),
+        }, status=400)
 
 
 @login_required
@@ -943,6 +1053,254 @@ def purchases_vendors(request):
         "purchases_vendors.html",
         context
     )
+
+@login_required
+def purchases_vendors_excel(request):
+    if request.method != "POST":
+        return redirect("purchases_vendors")
+
+    excel_file = request.FILES.get("excel_file")
+
+    if not excel_file:
+        messages.error(request, "Please select an Excel file.")
+        return redirect("purchases_vendors")
+
+    if not excel_file.name.lower().endswith((".xlsx", ".xls")):
+        messages.error(request, "Please upload an .xlsx or .xls file.")
+        return redirect("purchases_vendors")
+
+    if excel_file.size > 5 * 1024 * 1024:
+        messages.error(request, "File size cannot exceed 5 MB.")
+        return redirect("purchases_vendors")
+
+    try:
+        # Read Excel file
+        if excel_file.name.lower().endswith(".xlsx"):
+            workbook = load_workbook(
+                excel_file,
+                read_only=True,
+                data_only=True
+            )
+            sheet = workbook.active
+            rows = sheet.iter_rows(values_only=True)
+
+        else:
+            import xlrd
+
+            workbook = xlrd.open_workbook(
+                file_contents=excel_file.read()
+            )
+            sheet = workbook.sheet_by_index(0)
+            rows = (
+                sheet.row_values(row_index)
+                for row_index in range(sheet.nrows)
+            )
+
+        rows = iter(rows)
+        headers = next(rows, None)
+
+        if not headers:
+            messages.error(request, "The Excel file is empty.")
+            return redirect("purchases_vendors")
+
+        def normalize_header(value):
+            return str(value or "").strip().lower().replace("_", " ")
+
+        header_map = {
+            normalize_header(value): index
+            for index, value in enumerate(headers)
+            if value is not None and str(value).strip()
+        }
+
+        # Accept common header variations
+        aliases = {
+            "vat": "vat number",
+            "vat no": "vat number",
+            "opening balance type": "opening balance type",
+            "balance type": "opening balance type",
+        }
+
+        header_map = {
+            aliases.get(header, header): index
+            for header, index in header_map.items()
+        }
+
+        required_headers = [
+            "name",
+            "pan",
+            "vat number",
+            "mobile",
+            "email",
+            "address",
+            "opening balance",
+            "opening balance type",
+        ]
+
+        missing_headers = [
+            header for header in required_headers
+            if header not in header_map
+        ]
+
+        if missing_headers:
+            messages.error(
+                request,
+                "Missing Excel columns: "
+                + ", ".join(missing_headers)
+            )
+            return redirect("purchases_vendors")
+
+        def get_value(row, column):
+            index = header_map[column]
+
+            if index >= len(row):
+                return ""
+
+            value = row[index]
+
+            if value is None:
+                return ""
+
+            return str(value).strip()
+
+        imported_count = 0
+        errors = []
+
+        for row_number, row in enumerate(rows, start=2):
+            if not any(
+                value is not None and str(value).strip()
+                for value in row
+            ):
+                continue
+
+            try:
+                name = get_value(row, "name")
+                pan = get_value(row, "pan")
+                vat_number = get_value(row, "vat number")
+                mobile = get_value(row, "mobile")
+                email = get_value(row, "email")
+                address = get_value(row, "address")
+
+                opening_balance_text = get_value(
+                    row, "opening balance"
+                )
+
+                opening_balance_type = (
+                    get_value(row, "opening balance type").upper()
+                    or "DR"
+                )
+
+                if not name:
+                    raise ValueError("Vendor name is required.")
+
+                if opening_balance_type not in ("DR", "CR"):
+                    raise ValueError(
+                        "Opening Balance Type must be DR or CR."
+                    )
+
+                try:
+                    opening_balance = Decimal(
+                        opening_balance_text or "0"
+                    )
+                except InvalidOperation:
+                    raise ValueError(
+                        "Opening Balance must be a valid number."
+                    )
+
+                if not opening_balance.is_finite():
+                    raise ValueError(
+                        "Opening Balance must be a valid number."
+                    )
+
+                if opening_balance < 0:
+                    raise ValueError(
+                        "Opening Balance cannot be negative."
+                    )
+
+                if opening_balance > Decimal("9999999999999.99"):
+                    raise ValueError(
+                        "Opening Balance is too large."
+                    )
+
+                with transaction.atomic():
+                    vendor_code = generate_vendor_code()
+
+                    vendor = Vendor.objects.create(
+                        vendor_code=vendor_code,
+                        name=name,
+                        pan=pan,
+                        vat_number=vat_number,
+                        mobile=mobile,
+                        email=email,
+                        address=address,
+                        opening_balance=opening_balance,
+                    )
+
+                    if opening_balance != 0:
+                        if opening_balance_type == "DR":
+                            dr_amount = opening_balance
+                            cr_amount = Decimal("0.00")
+                            closing_balance = opening_balance
+                        else:
+                            dr_amount = Decimal("0.00")
+                            cr_amount = opening_balance
+                            closing_balance = -opening_balance
+
+                        VendorLedger.objects.create(
+                            vendor=vendor,
+                            transaction_date=timezone.localdate(),
+                            transaction_type="opening",
+                            amount=opening_balance,
+                            mode=None,
+                            remark="Opening Balance",
+                            dr=dr_amount,
+                            cr=cr_amount,
+                            closing_balance=closing_balance,
+                        )
+
+                imported_count += 1
+
+            except (ValueError, InvalidOperation, IntegrityError) as exc:
+                errors.append(f"Row {row_number}: {exc}")
+
+            except Exception as exc:
+                errors.append(f"Row {row_number}: Import failed ({exc})")
+
+        if imported_count:
+            messages.success(
+                request,
+                f"Successfully imported {imported_count} vendor(s)."
+            )
+
+        if errors:
+            messages.error(
+                request,
+                "Some rows could not be imported: "
+                + " | ".join(errors[:5])
+            )
+
+            if len(errors) > 5:
+                messages.error(
+                    request,
+                    f"And {len(errors) - 5} additional row(s) failed."
+                )
+
+        if imported_count == 0 and not errors:
+            messages.warning(
+                request,
+                "No vendor records were found to import."
+            )
+
+    except Exception as exc:
+        messages.error(
+            request,
+            f"Could not read the Excel file: {exc}"
+        )
+
+    finally:
+        if "workbook" in locals() and excel_file.name.lower().endswith(".xlsx"):
+            workbook.close()
+
+    return redirect("purchases_vendors")
 
 @login_required
 def vendor_ledger_download(request, vendor_id):
@@ -2361,10 +2719,14 @@ def inventory_products(request):
                 messages.error(request, str(e))
 
         else:
-            messages.error(
-                request,
-                "Please correct the highlighted errors."
-            )
+            print("PRODUCT FORM ERRORS:", form.errors)
+
+            for field, errors in form.errors.items():
+                for error in errors:
+                    messages.error(
+                        request,
+                        f"{field}: {error}"
+                    )
 
     else:
 
@@ -2409,6 +2771,8 @@ def inventory_products(request):
 
 
 @login_required
+
+@login_required
 def inventory_products_excel(request):
 
     if request.method != "POST":
@@ -2436,7 +2800,7 @@ def inventory_products_excel(request):
     workbook = None
 
     try:
-        # Open the first worksheet
+        # Read Excel file
         if extension == ".xlsx":
             workbook = load_workbook(
                 excel_file,
@@ -2463,25 +2827,49 @@ def inventory_products_excel(request):
             messages.error(request, "The Excel file is empty.")
             return redirect("inventory_products")
 
-        # Normalize headers
+        # Normalize headers: lowercase and remove extra spaces
         normalized_headers = [
-            str(header).strip().lower() if header is not None else ""
+            " ".join(str(header).strip().lower().split())
+            if header is not None else ""
             for header in headers
+        ]
+
+        # Support common alternative header names
+        header_aliases = {
+            "hsn code": "hsn",
+            "unit of measure": "unit",
+            "whole sale quantity": "whole sale qty",
+            "wholesale price": "whole sale price",
+            "wholesale qty": "whole sale qty",
+            "opening stock": "opening qty",
+            "opening quantity": "opening qty",
+            "reorder": "reorder level",
+        }
+
+        normalized_headers = [
+            header_aliases.get(header, header)
+            for header in normalized_headers
         ]
 
         required_columns = [
             "item name",
+            "brand",
+            "model number",
             "category",
             "hsn",
             "specification",
+            "stock tracking",
+            "selling price",
+            "whole sale price",
+            "whole sale qty",
             "unit",
-            "opening stock",
-            "reorder",
+            "reorder level",
+            "opening qty",
+            "purchase price",
         ]
 
         missing_columns = [
-            column
-            for column in required_columns
+            column for column in required_columns
             if column not in normalized_headers
         ]
 
@@ -2490,11 +2878,11 @@ def inventory_products_excel(request):
                 request,
                 "Missing Excel columns: "
                 + ", ".join(missing_columns)
-                + ". Please use all six required column headers."
+                + ". Please use the complete product Excel template."
             )
             return redirect("inventory_products")
 
-        # Column positions
+        # Get the first position of each header
         column_index = {
             name: normalized_headers.index(name)
             for name in required_columns
@@ -2508,11 +2896,67 @@ def inventory_products_excel(request):
 
             value = row[index]
 
-            # Avoid values like 5.0 for whole-number Excel cells
             if isinstance(value, float) and value.is_integer():
                 value = int(value)
 
             return str(value).strip()
+
+        def decimal_value(value, field_name, row_number):
+            if value == "":
+                return Decimal("0.00")
+
+            try:
+                result = Decimal(value)
+
+                if not result.is_finite() or result < 0:
+                    raise ValueError
+
+                return result
+
+            except Exception:
+                raise ValueError(
+                    f"Row {row_number}: {field_name} must be "
+                    "a valid non-negative number."
+                )
+
+        def whole_number(value, field_name, row_number, default=0):
+            if value == "":
+                return default
+
+            try:
+                number = Decimal(value)
+
+                if (
+                    not number.is_finite()
+                    or number < 0
+                    or number != number.to_integral_value()
+                ):
+                    raise ValueError
+
+                return int(number)
+
+            except Exception:
+                raise ValueError(
+                    f"Row {row_number}: {field_name} must be "
+                    "a non-negative whole number."
+                )
+
+        def boolean_value(value, row_number):
+            value = value.strip().lower()
+
+            if value == "":
+                return False
+
+            if value in ("true", "yes", "1"):
+                return True
+
+            if value in ("false", "no", "0"):
+                return False
+
+            raise ValueError(
+                f"Row {row_number}: Stock Tracking must be "
+                "True or False."
+            )
 
         imported = 0
         skipped = 0
@@ -2522,7 +2966,7 @@ def inventory_products_excel(request):
 
             for row_number, row in enumerate(rows, start=2):
 
-                # Ignore completely empty rows
+                # Ignore empty rows
                 if not row or all(
                     value is None or str(value).strip() == ""
                     for value in row
@@ -2530,59 +2974,91 @@ def inventory_products_excel(request):
                     continue
 
                 item_name = cell_value(row, "item name")
+                brand = cell_value(row, "brand")
+                model_number = cell_value(row, "model number")
                 category = cell_value(row, "category")
                 hsn = cell_value(row, "hsn")
                 specification = cell_value(row, "specification")
-                unit = cell_value(row, "unit")
-                opening_stock_text = cell_value(row, "opening stock")
-                reorder_text = cell_value(row, "reorder")
-
-                # Required values
-                if not item_name or not category:
-                    skipped += 1
-                    errors.append(
-                        f"Row {row_number}: Item Name and Category are required."
-                    )
-                    continue
-
-                # Reorder level validation
-                if reorder_text == "":
-                    reorder_level = 10
-                else:
-                    try:
-                        reorder_level = int(reorder_text)
-
-                        if reorder_level < 0:
-                            raise ValueError
-
-                    except (ValueError, TypeError):
-                        skipped += 1
-                        errors.append(
-                            f"Row {row_number}: Reorder must be a "
-                            "non-negative whole number."
-                        )
-                        continue
+                unit = cell_value(row, "unit") or "pcs"
 
                 try:
+                    # Required values
+                    if not item_name or not category:
+                        raise ValueError(
+                            f"Row {row_number}: Item Name and Category "
+                            "are required."
+                        )
+
+                    # Validate numeric fields
+                    selling_price = decimal_value(
+                        cell_value(row, "selling price"),
+                        "Selling Price",
+                        row_number
+                    )
+
+                    whole_sale_price = decimal_value(
+                        cell_value(row, "whole sale price"),
+                        "Whole Sale Price",
+                        row_number
+                    )
+
+                    purchase_price = decimal_value(
+                        cell_value(row, "purchase price"),
+                        "Purchase Price",
+                        row_number
+                    )
+
+                    whole_sale_qty = whole_number(
+                        cell_value(row, "whole sale qty"),
+                        "Whole Sale Qty",
+                        row_number
+                    )
+
+                    reorder_level = whole_number(
+                        cell_value(row, "reorder level"),
+                        "Reorder Level",
+                        row_number,
+                        default=10
+                    )
+
+                    opening_qty = whole_number(
+                        cell_value(row, "opening qty"),
+                        "Opening Qty",
+                        row_number
+                    )
+
+                    stock_tracking = boolean_value(
+                        cell_value(row, "stock tracking"),
+                        row_number
+                    )
+
                     with transaction.atomic():
 
-                        # Generate the item code using your existing function
+                        # Generate item code using your existing function
                         item_code = generate_item_code(category)
 
+                        # Create product
                         product = Product.objects.create(
                             item_code=item_code,
                             item_name=item_name,
+                            brand=brand,
+                            model_number=model_number,
                             category=category,
                             hs_code=hsn,
                             specification=specification,
-                            unit_of_measure=unit or "pcs",
+                            stock_tracking=stock_tracking,
+                            selling_price=selling_price,
+                            whole_sale_price=whole_sale_price,
+                            whole_sale_qty=whole_sale_qty,
+                            unit_of_measure=unit,
                             reorder_level=reorder_level,
                         )
 
-                        # Initialize stock at zero
-                        InventoryStock.objects.get_or_create(
+                        # Initialize stock and purchase cost
+                        InventoryStock.objects.create(
                             product=product,
-                            quantity_on_hand=int(opening_stock_text) if opening_stock_text else 0,
+                            quantity_on_hand=opening_qty,
+                            last_cost=purchase_price,
                         )
 
                     imported += 1
@@ -2591,7 +3067,7 @@ def inventory_products_excel(request):
                     skipped += 1
                     errors.append(
                         f"Row {row_number}: Could not import "
-                        f"{item_name}. {str(e)}"
+                        f"{item_name or '(unnamed product)'}. {str(e)}"
                     )
 
         if imported:
@@ -2606,14 +3082,14 @@ def inventory_products_excel(request):
                 f"No products were imported. {skipped} row(s) skipped."
             )
 
-        # Show a limited number of row errors
         for error in errors[:5]:
             messages.warning(request, error)
 
         if len(errors) > 5:
             messages.warning(
                 request,
-                f"{len(errors) - 5} additional row errors were not displayed."
+                f"{len(errors) - 5} additional row errors "
+                "were not displayed."
             )
 
     except Exception:
@@ -2628,6 +3104,7 @@ def inventory_products_excel(request):
             workbook.close()
 
     return redirect("inventory_products")
+
 
 
 

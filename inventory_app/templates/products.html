@@ -312,7 +312,7 @@
                 </div>
 
                 <div class="modal-body">
-
+                    
                     <div class="alert alert-info">
                         <h6 class="fw-bold">
                             <i class="fas fa-info-circle me-1"></i>
@@ -320,9 +320,8 @@
                         </h6>
 
                         <p class="mb-2">
-                            The first row must contain all six column headers
-                            shown below. Header capitalization and extra spaces
-                            are ignored.
+                            The first row must contain the column headers shown below.
+                            Header capitalization and extra spaces are ignored.
                         </p>
 
                         <div class="table-responsive">
@@ -330,45 +329,73 @@
                                 <thead class="table-light">
                                     <tr>
                                         <th>Item Name</th>
-                                        <th>Specification</th>
+                                        <th>Brand</th>
+                                        <th>Model Number</th>
                                         <th>Category</th>
                                         <th>HSN</th>
+                                        <th>Specification</th>
+                                        <th>Stock Tracking</th>
+                                        <th>Selling Price</th>
+                                        <th>Whole Sale Price</th>
+                                        <th>Whole Sale Qty</th>
                                         <th>Unit</th>
-                                        <th>Opening Stock</th>
-                                        <th>Reorder</th>
+                                        <th>Reorder Level</th>
+                                        <th>Opening Qty</th>
+                                        <th>Purchase Price</th>
                                     </tr>
                                 </thead>
+
                                 <tbody>
                                     <tr>
                                         <td>8GB RAM</td>
-                                        <td>DDR4 Desktop RAM</td>
+                                        <td>Kingston</td>
+                                        <td>KVR8</td>
                                         <td>Computer Components</td>
                                         <td>84733020</td>
+                                        <td>DDR4 Desktop RAM</td>
+                                        <td>True</td>
+                                        <td>1800</td>
+                                        <td>1600</td>
+                                        <td>5</td>
                                         <td>pcs</td>
-                                        <td>2</td>
-                                        <td>5</td>    
+                                        <td>5</td>
+                                        <td>10</td>
+                                        <td>1200</td>
                                     </tr>
                                     <tr>
                                         <td>1TB SSD</td>
-                                        <td>SATA SSD</td>
+                                        <td>Samsung</td>
+                                        <td>870 EVO</td>
                                         <td>Storage</td>
                                         <td>84717030</td>
+                                        <td>SATA SSD</td>
+                                        <td>True</td>
+                                        <td>6500</td>
+                                        <td>6000</td>
+                                        <td>3</td>
                                         <td>pcs</td>
-                                        <td>1</td>
-                                        <td>3</td>    
+                                        <td>3</td>
+                                        <td>5</td>
+                                        <td>4500</td>
                                     </tr>
                                 </tbody>
                             </table>
                         </div>
 
                         <ul class="small mb-0">
-                            <li>Item Name and Category are mandatory.</li>
-                            <li>HSN, Specification and Unit can be left blank.</li>
-                            <li>Reorder must be a non-negative whole number.</li>
-                            <li>Item Code is generated automatically.</li>
+                            <li><strong>Item Name and Category:</strong> Mandatory.</li>
+                            <li><strong>Brand, Model Number and Specification:</strong> Optional.</li>
+                            <li><strong>HSN:</strong> Use the HSN code appropriate for the product.</li>
+                            <li><strong>Stock Tracking:</strong> Enter True or False.</li>
+                            <li><strong>Selling Price, Whole Sale Price and Purchase Price:</strong> Enter numeric amounts.</li>
+                            <li><strong>Whole Sale Qty, Reorder Level and Opening Qty:</strong> Enter non-negative whole numbers.</li>
+                            <li><strong>Unit:</strong> Use values such as pcs, nos, box, set, kg, ltr or mtr.</li>
+                            <li><strong>Item Code:</strong> Generated automatically; do not include it in the Excel file.</li>
+                            <li><strong>Created At and Updated At:</strong> Generated automatically; do not include them.</li>
                             <li>Save HSN codes as text in Excel if they contain leading zeros.</li>
                         </ul>
                     </div>
+
 
                     <div class="mb-3">
                         <label for="productsExcelFile"

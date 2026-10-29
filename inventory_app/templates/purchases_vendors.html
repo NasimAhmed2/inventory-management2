@@ -74,7 +74,22 @@
                             DR = You owe the vendor &nbsp; | &nbsp; CR = Vendor owes you
                         </small>
                     </div>
-                    <button type="submit" class="btn btn-primary">Save Vendor</button>
+                    <div class="d-flex gap-2">
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-save me-1"></i>
+                            Save Vendor
+                        </button>
+
+                        <button
+                            type="button"
+                            class="btn btn-success"
+                            data-bs-toggle="modal"
+                            data-bs-target="#uploadVendorsModal"
+                        >
+                            <i class="fas fa-file-excel me-1"></i>
+                            Import via Excel
+                        </button>
+                    </div>
                 </form>
             </div>
         </div>
@@ -129,4 +144,161 @@
         </div>
     </div>
 </div>
+
+
+<!-- Upload Vendors Excel Modal -->
+<div class="modal fade" id="uploadVendorsModal"
+     tabindex="-1" aria-labelledby="uploadVendorsModalLabel"
+     aria-hidden="true">
+
+    <div class="modal-dialog modal-dialog-centered modal-xl">
+        <div class="modal-content border-0 shadow">
+
+            <form method="POST"
+                  action="{% url 'purchases_vendors_excel' %}"
+                  enctype="multipart/form-data">
+
+                {% csrf_token %}
+
+                <div class="modal-header">
+                    <div>
+                        <h5 class="modal-title" id="uploadVendorsModalLabel">
+                            <i class="fas fa-file-excel text-success me-2"></i>
+                            Import Vendors from Excel
+                        </h5>
+                        <small class="text-muted">
+                            Bulk import your vendor records
+                        </small>
+                    </div>
+
+                    <button type="button" class="btn-close"
+                            data-bs-dismiss="modal"
+                            aria-label="Close"></button>
+                </div>
+
+                <div class="modal-body">
+
+                    <div class="alert alert-info">
+                        <h6 class="fw-bold">
+                            <i class="fas fa-info-circle me-1"></i>
+                            Excel File Instructions
+                        </h6>
+
+                        <p class="mb-2">
+                            The first row must contain all 9 column headers.
+                            Header capitalization and surrounding spaces can be ignored
+                            by the import view if it supports header normalization.
+                        </p>
+
+                        <div class="table-responsive">
+                            <table class="table table-bordered table-sm bg-white mb-2">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>Name</th>
+                                        <th>PAN</th>
+                                        <th>VAT Number</th>
+                                        <th>Mobile</th>
+                                        <th>Email</th>
+                                        <th>Address</th>
+                                        <th>Opening Balance</th>
+                                        <th>Opening Balance Type</th>
+                                    </tr>
+                                </thead>
+
+                                <tbody>
+                                    <tr>
+                                        <td>ABC Computers</td>
+                                        <td>ABCDE1234F</td>
+                                        <td>VAT12345</td>
+                                        <td>9876543210</td>
+                                        <td>abc@example.com</td>
+                                        <td>Delhi, India</td>
+                                        <td>25000</td>
+                                        <td>DR</td>
+                                    </tr>
+
+                                    <tr>
+                                        <td>XYZ Electronics</td>
+                                        <td></td>
+                                        <td></td>
+                                        <td>9876501234</td>
+                                        <td></td>
+                                        <td>Noida, Uttar Pradesh</td>
+                                        <td>10000</td>
+                                        <td>CR</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <ul class="small mb-0">
+                            <li>
+                                All 9 column headers are required in the sample format.
+                            </li>
+                            <li>
+                                Name is required. Other fields may be left blank if
+                                your import view permits it.
+                            </li>
+                            <li>
+                                Vendor Code should be unique. If your application
+                                generates vendor codes automatically, leave this column
+                                blank and let the import view generate them.
+                            </li>
+                            <li>
+                                Opening Balance must be a number and cannot be negative
+                                if your import logic validates it as a positive amount.
+                            </li>
+                            <li>
+                                Opening Balance Type must be <strong>DR</strong> or
+                                <strong>CR</strong>. DR means you owe the vendor;
+                                CR means the vendor owes you.
+                            </li>
+                            <li>
+                                Format Mobile cells as Text to preserve leading zeros.
+                            </li>
+                            <li>
+                                Supported formats: .xlsx and .xls. Maximum size: 5 MB.
+                            </li>
+                        </ul>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="vendorsExcelFile"
+                               class="form-label fw-semibold">
+                            Select Excel File
+                        </label>
+
+                        <input type="file"
+                               class="form-control"
+                               id="vendorsExcelFile"
+                               name="excel_file"
+                               accept=".xlsx,.xls"
+                               required>
+
+                        <div class="form-text">
+                            Select the Excel file containing your vendor records.
+                        </div>
+                    </div>
+
+                </div>
+
+                <div class="modal-footer">
+                    <button type="button"
+                            class="btn btn-light"
+                            data-bs-dismiss="modal">
+                        Cancel
+                    </button>
+
+                    <button type="submit" class="btn btn-success">
+                        <i class="fas fa-upload me-1"></i>
+                        Import Vendors
+                    </button>
+                </div>
+
+            </form>
+
+        </div>
+    </div>
+</div>
+
 {% endblock %}
