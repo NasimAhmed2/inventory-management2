@@ -412,15 +412,23 @@
 
                     <div class="d-flex justify-content-between">
 
-                        <strong>
-                            Net Amount
-                        </strong>
+                        <strong>Net Amount</strong>
 
-                        <strong class="fs-5">
-
+                        <strong class="fs-5" id="summary-grand-total">
                             {{ invoice.grand_total|floatformat:2 }}
-
                         </strong>
+
+                    </div>
+
+                    <div class="mt-3 pt-2 border-top">
+
+                        <small class="text-muted">
+                            Amount in Words
+                        </small>
+
+                        <div class="fw-semibold">
+                            {{ amount_in_words }}
+                        </div>
 
                     </div>
 
@@ -489,5 +497,36 @@
 }
 
 </style>
+
+<script>
+    function updateAmountInWords() {
+
+        const totalElement = document.getElementById("summary-grand-total");
+        const wordsElement = document.getElementById("amount-in-words");
+
+        if (!totalElement || !wordsElement) return;
+
+        const amount = Number(
+            totalElement.textContent.replace(/,/g, "").trim()
+        );
+
+        if (!Number.isFinite(amount) || amount < 0) return;
+
+        const [rupeesText, paiseText] = amount.toFixed(2).split(".");
+
+        const rupees = Number(rupeesText);
+        const paise = Number(paiseText);
+
+        let words = numberToIndianWords(rupees) + " Rupees";
+
+        if (paise > 0) {
+            words += " and " + numberToIndianWords(paise) + " Paise";
+        }
+
+        wordsElement.textContent = words + " Only";
+    }
+
+    document.addEventListener("DOMContentLoaded", updateAmountInWords);
+</script>
 
 {% endblock %}

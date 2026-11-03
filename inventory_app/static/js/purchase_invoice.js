@@ -140,6 +140,14 @@ document.addEventListener("DOMContentLoaded", function () {
         ).value = product.specification || "";
 
         row.querySelector(
+            ".rate"
+        ).value = product.last_rate || "";
+
+        row.querySelector(
+            ".selling_rate"
+        ).value = product.selling_price || 50;
+
+        row.querySelector(
             ".hsn"
         ).value = product.hs_code || "";
 
@@ -521,6 +529,15 @@ document.addEventListener("DOMContentLoaded", function () {
 
                 <td>
                     <input
+                        type="text"
+                        class="form-control hsn"
+                        name="hsn[]"
+                        readonly
+                    >
+                </td>
+
+                <td>
+                    <input
                         type="number"
                         class="form-control quantity"
                         name="quantity[]"
@@ -545,20 +562,25 @@ document.addEventListener("DOMContentLoaded", function () {
 
                 <td>
                     <input
-                        type="text"
-                        class="form-control line-total"
-                        readonly
+                        type="number"
+                        class="form-control selling_rate"
+                        name="selling_rate[]"
+                        value="0"
+                        min="0"
+                        step="0.01"
+                        required
                     >
                 </td>
 
                 <td>
                     <input
                         type="text"
-                        class="form-control hsn"
-                        name="hsn[]"
+                        class="form-control line-total"
                         readonly
                     >
                 </td>
+
+                
 
                 <td class="text-center">
 

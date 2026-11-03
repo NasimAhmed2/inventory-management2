@@ -42,13 +42,14 @@
                         <thead class="table-light">
                             <tr>
                                 <th width="260">Product</th>
-                                <th width="160">Item Code</th>
+                                <th width="110">Item Code</th>
                                 <th>Item Name</th>
                                 <th>Specification</th>
+                                <th width="120">HSN</th>
                                 <th width="90">Qty</th>
                                 <th width="120">Rate</th>
+                                <th width="120">S. Rate</th>
                                 <th width="130">Line Total</th>
-                                <th width="120">HSN</th>
                                 <th width="50"></th>
                             </tr>
                         </thead>
@@ -129,6 +130,16 @@
                                     >
                                 </td>
 
+                                <!-- HSN -->
+                                <td>
+                                    <input
+                                        type="text"
+                                        class="form-control hsn"
+                                        name="hsn[]"
+                                        readonly
+                                    >
+                                </td>
+
 
                                 <!-- Quantity -->
                                 <td>
@@ -157,6 +168,19 @@
                                     >
                                 </td>
 
+                                <!-- Selling Rate -->
+                                <td>
+                                    <input
+                                        type="number"
+                                        class="form-control selling_rate"
+                                        name="selling_rate[]"
+                                        value="0"
+                                        min="0"
+                                        step="0.01"
+                                        required
+                                    >
+                                </td>
+
 
                                 <!-- Line Total -->
                                 <td>
@@ -168,15 +192,7 @@
                                 </td>
 
 
-                                <!-- HSN -->
-                                <td>
-                                    <input
-                                        type="text"
-                                        class="form-control hsn"
-                                        name="hsn[]"
-                                        readonly
-                                    >
-                                </td>
+                                
 
 
                                 <!-- Remove -->
@@ -263,6 +279,14 @@
 </div>
 
 {{ products_json|json_script:"products-data" }}
+<script>
+    const products = JSON.parse(
+        document.getElementById("products-data").textContent
+    );
+
+    console.log("Products JSON:", products);
+    console.table(products);
+</script>
 <script src="{% static 'js/purchase_invoice.js' %}"></script>
 
 {% endblock %}

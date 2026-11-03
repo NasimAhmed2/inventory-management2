@@ -1,6 +1,7 @@
 import os
 import re
 import uuid
+from num2words import num2words
 from datetime import datetime
 from decimal import Decimal, InvalidOperation
 from django.views.decorators.http import require_POST
@@ -2151,14 +2152,17 @@ def purchases_invoices(request):
     product_categories = sorted({product.category for product in products if product.category})
     products_json = []
     
+    products_json = []
+
     for product in products:
 
         try:
-            available_stock = (
-                product.stock.quantity_available
-            )
+            stock = product.stock
+            available_stock = stock.quantity_available
+            last_rate = stock.last_cost or 0
         except InventoryStock.DoesNotExist:
             available_stock = 0
+            last_rate = 0
 
         products_json.append({
             "id": product.id,
@@ -2166,9 +2170,9 @@ def purchases_invoices(request):
             "item_code": product.item_code,
             "item_name": product.item_name,
             "specification": product.specification,
-            "selling_price": float(
-                product.selling_price
-            ),
+            "hs_code": product.hs_code,
+            "last_rate": float(last_rate),
+            "selling_price": float(product.selling_price or 0),
             "available_stock": available_stock,
         })
     context = {
@@ -4131,10 +4135,7 @@ def sales_invoice_create_save(request):
 
 
 @login_required
-def sales_invoice_detail(
-    request,
-    invoice_id,
-):
+def sales_invoice_detail(request, invoice_id):
 
     invoice = get_object_or_404(
         SalesInvoice.objects
@@ -4153,8 +4154,27 @@ def sales_invoice_detail(
         pk=invoice_id,
     )
 
+    grand_total = invoice.grand_total or 0
+
+    rupees = int(grand_total)
+    paise = round((grand_total - rupees) * 100)
+
+    amount_in_words = num2words(
+        rupees,
+        lang="en_IN"
+    ).title() + " Rupees"
+
+    if paise > 0:
+        amount_in_words += " and " + num2words(
+            paise,
+            lang="en_IN"
+        ).title() + " Paise"
+
+    amount_in_words += " Only"
+
     context = {
         "invoice": invoice,
+        "amount_in_words": amount_in_words,
     }
 
     return render(
