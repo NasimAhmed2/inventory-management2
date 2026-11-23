@@ -30,7 +30,7 @@ from .services import (
 )
 
 from .helpers import (
-    generate_item_code, generate_vendor_code, generate_invoice_number
+    generate_item_code, generate_vendor_code
 )
 
 
@@ -40,6 +40,7 @@ from datetime import date, datetime
 from django.http import JsonResponse
 from django.contrib.auth.decorators import login_required
 from django.http import HttpResponse
+from django.core.paginator import Paginator
 
 from openpyxl import load_workbook, Workbook
 from openpyxl.styles import Font, Alignment
@@ -189,6 +190,7 @@ def sales_customers(request):
             Q(customer_code__icontains=search) |
             Q(name__icontains=search) |
             Q(mobile__icontains=search) |
+            Q(pan_number__icontains=search) |
             Q(email__icontains=search)
         )
 
@@ -2041,121 +2043,366 @@ def vendor_transaction_add(request, vendor_id):
     )
 
 def purchases_invoices(request):
-    invoices = PurchaseInvoice.objects.select_related("vendor").prefetch_related("items")
 
+    
     if request.method == "POST":
-        with transaction.atomic():
-            vendor_id = request.POST.get("vendor")
-            invoice_date_value = request.POST.get("invoice_date")
-            credit_period = request.POST.get("credit_period", "0")
-            narration = request.POST.get("narration", "").strip()
-            invoice_number = request.POST.get("invoice_number", "").strip()
-            pdf_file = request.FILES.get("pdf_file")
 
-            if not vendor_id or not invoice_date_value:
-                messages.error(request, "Please select a vendor and invoice date.")
-                return redirect("purchases_invoices")
+        vendor_id = request.POST.get("vendor")
+        invoice_date_value = request.POST.get("invoice_date")
+        invoice_number = request.POST.get("invoice_number", "").strip()
 
-            invoice_date = datetime.strptime(invoice_date_value, "%Y-%m-%d").date()
-            invoice_number = invoice_number or generate_invoice_number(invoice_date)
-            vendor = Vendor.objects.get(pk=vendor_id)
+        if not vendor_id or not invoice_date_value or not invoice_number:
+            messages.error(request, "Please enter vendor, invoice number and invoice date.")
+            return redirect("purchases_invoices")
 
-            invoice = PurchaseInvoice.objects.create(
-                invoice_number=invoice_number,
-                vendor=vendor,
-                invoice_date=invoice_date,
-                credit_period=int(credit_period or 0),
-                narration=narration,
-            )
+        try:
+            invoice_date = datetime.strptime(
+                invoice_date_value, "%Y-%m-%d"
+            ).date()
+        except ValueError:
+            messages.error(request, "Invalid invoice date.")
+            return redirect("purchases_invoices")
 
-            if pdf_file:
-                file_name = f"{uuid.uuid4().hex}_{pdf_file.name}"
-                file_path = os.path.join(settings.MEDIA_ROOT, "purchases", file_name)
-                os.makedirs(os.path.dirname(file_path), exist_ok=True)
-                with open(file_path, "wb+") as destination:
-                    for chunk in pdf_file.chunks():
-                        destination.write(chunk)
-                invoice.pdf_path = os.path.join("purchases", file_name)
-                invoice.save(update_fields=["pdf_path"])
+        try:
+            with transaction.atomic():
 
-            line_categories = request.POST.getlist("item_category[]")
-            line_codes = request.POST.getlist("item_code[]")
-            line_names = request.POST.getlist("item_name[]")
-            line_specs = request.POST.getlist("item_specification[]")
-            line_quantities = request.POST.getlist("quantity[]")
-            line_rates = request.POST.getlist("rate[]")
-            line_hsn = request.POST.getlist("hsn[]")
+                invoice_id = request.POST.get("invoice_id", "").strip()
 
-            line_totals = []
-            for index, item_code in enumerate(line_codes):
-                category = line_categories[index] if index < len(line_categories) else ""
-                quantity = line_quantities[index] if index < len(line_quantities) else "1"
-                rate = line_rates[index] if index < len(line_rates) else "0"
-                if not category or not item_code or not quantity or not rate:
-                    continue
+                # ----------------------------------
+                # CREATE OR FETCH INVOICE
+                # ----------------------------------
 
-                product = Product.objects.filter(category=category, item_code=item_code).first()
-                if not product:
-                    continue
+                if invoice_id:
+                    invoice = get_object_or_404(
+                        PurchaseInvoice.objects.select_for_update(),
+                        pk=invoice_id
+                    )
 
-                qty = int(quantity)
-                rate_value = Decimal(rate)
-                line_total = Decimal(qty) * rate_value
-                line_totals.append(line_total)
+                    old_vendor = invoice.vendor
 
-                PurchaseLineItem.objects.create(
-                    invoice=invoice,
-                    item_name=product.item_name or line_names[index],
-                    item_code=product.item_code,
-                    specification=product.specification or line_specs[index],
-                    quantity=qty,
-                    rate=rate_value,
-                    line_total=line_total,
-                    hs_code=product.hs_code or line_hsn[index],
+                    # Save old document number before changing vendor/details.
+                    old_document_number = str(invoice)
+
+                    # Find original purchase movements.
+                    purchase_movements = list(
+                        InventoryMovement.objects
+                        .filter(movement_type=InventoryMovement.PURCHASE)
+                        .filter(
+                            Q(
+                                reference_type="Purchase",
+                                reference_id=invoice.pk
+                            )
+                            |
+                            Q(
+                                reference_type="Purchase",
+                                document_number=old_document_number
+                            )
+                        )
+                        .select_related("product")
+                    )
+
+                    # Find movements that have already been reversed.
+                    movement_ids = [movement.pk for movement in purchase_movements]
+
+                    reversed_ids = set(
+                        InventoryMovement.objects.filter(
+                            movement_type=InventoryMovement.PURCHASE_RETURN,
+                            reference_type="PurchaseEditReversal",
+                            reference_id__in=movement_ids,
+                        ).values_list("reference_id", flat=True)
+                    )
+
+                    # Reverse only movements that have not already been reversed.
+                    for movement in purchase_movements:
+
+                        if movement.pk in reversed_ids:
+                            continue
+
+                        InventoryService.reverse_purchase(
+                            movement=movement,
+                            document_number=old_document_number,
+                            user=request.user,
+                        )
+
+                    # Remove old invoice items.
+                    invoice.items.all().delete()
+
+                    # Update existing invoice.
+                    invoice.vendor = Vendor.objects.get(pk=vendor_id)
+                    invoice.invoice_number = invoice_number
+                    invoice.invoice_date = invoice_date
+                    invoice.credit_period = int(
+                        request.POST.get("credit_period", "0") or 0
+                    )
+                    invoice.narration = request.POST.get("narration", "").strip()
+
+                    invoice.save()
+
+                else:
+                    old_vendor = None
+
+                    invoice = PurchaseInvoice.objects.create(
+                        invoice_number=invoice_number,
+                        vendor=Vendor.objects.get(pk=vendor_id),
+                        invoice_date=invoice_date,
+                        credit_period=int(
+                            request.POST.get("credit_period", "0") or 0
+                        ),
+                        narration=request.POST.get("narration", "").strip(),
+                    )
+
+                vendor = invoice.vendor
+
+                # ----------------------------------
+                # PDF UPLOAD
+                # ----------------------------------
+
+                pdf_file = request.FILES.get("pdf_file")
+
+                if pdf_file:
+
+                    file_name = f"{uuid.uuid4().hex}_{pdf_file.name}"
+
+                    file_path = os.path.join(
+                        settings.MEDIA_ROOT,
+                        "purchases",
+                        file_name
+                    )
+
+                    os.makedirs(os.path.dirname(file_path), exist_ok=True)
+
+                    with open(file_path, "wb+") as destination:
+                        for chunk in pdf_file.chunks():
+                            destination.write(chunk)
+
+                    invoice.pdf_path = os.path.join("purchases", file_name)
+                    invoice.save(update_fields=["pdf_path"])
+
+                # ----------------------------------
+                # GET FORM ITEMS
+                # ----------------------------------
+
+                line_categories = request.POST.getlist("item_category[]")
+                line_codes = request.POST.getlist("item_code[]")
+                line_names = request.POST.getlist("item_name[]")
+                line_specs = request.POST.getlist("item_specification[]")
+                line_quantities = request.POST.getlist("quantity[]")
+                line_rates = request.POST.getlist("rate[]")
+                line_hsn = request.POST.getlist("hsn[]")
+
+                # Support either naming convention used by the form.
+                line_tax_percentages = (
+                    request.POST.getlist("tax_percentage[]")
+                    or request.POST.getlist("vat_rate[]")
                 )
 
-                try:
+                total_amount = Decimal("0.00")
+                total_tax = Decimal("0.00")
+
+                # ----------------------------------
+                # SAVE NEW ITEMS AND STOCK
+                # ----------------------------------
+
+                for index, item_code in enumerate(line_codes):
+
+                    category = (
+                        line_categories[index]
+                        if index < len(line_categories) else ""
+                    )
+
+                    quantity = (
+                        line_quantities[index]
+                        if index < len(line_quantities) else "1"
+                    )
+
+                    rate = (
+                        line_rates[index]
+                        if index < len(line_rates) else "0"
+                    )
+
+                    if not category or not item_code or not quantity or not rate:
+                        continue
+
+                    product = Product.objects.filter(
+                        category=category,
+                        item_code=item_code
+                    ).first()
+
+                    if not product:
+                        continue
+
+                    qty = int(quantity)
+                    rate_value = Decimal(rate)
+
+                    tax_percentage = Decimal(
+                        line_tax_percentages[index]
+                        if index < len(line_tax_percentages)
+                        and line_tax_percentages[index]
+                        else "13"
+                    )
+
+                    item_amount = Decimal(qty) * rate_value
+
+                    tax_amount = (
+                        item_amount * tax_percentage / Decimal("100")
+                    ).quantize(Decimal("0.01"))
+
+                    line_total = item_amount + tax_amount
+
+                    total_amount += item_amount
+                    total_tax += tax_amount
+
+                    PurchaseLineItem.objects.create(
+                        invoice=invoice,
+                        item_name=product.item_name or line_names[index],
+                        item_code=product.item_code,
+                        specification=product.specification or line_specs[index],
+                        quantity=qty,
+                        rate=rate_value,
+                        tax_percentage=tax_percentage,
+                        tax_amount=tax_amount,
+                        line_total=line_total,
+                        hs_code=product.hs_code or line_hsn[index],
+                    )
+
                     InventoryService.purchase(
                         product=product,
                         quantity=qty,
                         unit_cost=rate_value,
                         document_number=invoice,
+                        reference_id=invoice.pk,
                         user=request.user,
-                        remarks=f"Purchase from {invoice.vendor.name}",
+                        remarks=f"Purchase from {vendor.name}",
                     )
 
-                except Exception as e:
-                    messages.error(request, str(e))
-                    raise
+                # ----------------------------------
+                # UPDATE INVOICE TOTALS
+                # ----------------------------------
 
-            invoice.total_amount = sum(line_totals, Decimal("0"))
-            invoice.grand_total = invoice.total_amount
-            invoice.save(update_fields=["total_amount", "grand_total"])
+                invoice.total_amount = total_amount
+                invoice.tax_amount = total_tax
+                invoice.grand_total = total_amount + total_tax
 
-            VendorLedger.objects.create(
-                vendor=vendor,
-                transaction_date=invoice.invoice_date,
-                transaction_type="purchase",
-                amount=invoice.grand_total,
-                against_invoice=invoice,
-                remark=f"Purchase Invoice {invoice.invoice_number}",
-                cr=invoice.grand_total,
-                dr=Decimal("0.00"),
-            )
+                invoice.save(update_fields=[
+                    "total_amount",
+                    "tax_amount",
+                    "grand_total",
+                ])
 
-            VendorLedgerService.recalculate(vendor)
+                # ----------------------------------
+                # UPDATE VENDOR LEDGER
+                # ----------------------------------
 
-            messages.success(request, "Purchase invoice created successfully.")
+                ledger_entry = VendorLedger.objects.filter(
+                    against_invoice=invoice,
+                    transaction_type="purchase"
+                ).first()
+
+                if ledger_entry:
+
+                    ledger_entry.vendor = vendor
+                    ledger_entry.transaction_date = invoice.invoice_date
+                    ledger_entry.amount = invoice.grand_total
+                    ledger_entry.remark = (
+                        f"Purchase Invoice {invoice.invoice_number}"
+                    )
+                    ledger_entry.cr = invoice.grand_total
+                    ledger_entry.dr = Decimal("0.00")
+
+                    ledger_entry.save()
+
+                else:
+
+                    VendorLedger.objects.create(
+                        vendor=vendor,
+                        transaction_date=invoice.invoice_date,
+                        transaction_type="purchase",
+                        amount=invoice.grand_total,
+                        against_invoice=invoice,
+                        remark=f"Purchase Invoice {invoice.invoice_number}",
+                        cr=invoice.grand_total,
+                        dr=Decimal("0.00"),
+                    )
+
+                # Recalculate old vendor if vendor was changed.
+                if old_vendor and old_vendor.pk != vendor.pk:
+                    VendorLedgerService.recalculate(old_vendor)
+
+                VendorLedgerService.recalculate(vendor)
+
+            if invoice_id:
+                messages.success(request, "Purchase invoice updated successfully.")
+            else:
+                messages.success(request, "Purchase invoice created successfully.")
+
             return redirect("purchases_invoices")
 
+        except Exception as e:
+
+            messages.error(request, f"Unable to save purchase invoice: {str(e)}")
+            return redirect("purchases_invoices")
+
+
+    # Load invoice for editing
+    edit_invoice = None
+    edit_items = []
+
+    edit_id = request.GET.get("edit")
+
+    if edit_id:
+        edit_invoice = get_object_or_404(
+            PurchaseInvoice.objects.select_related("vendor").prefetch_related("items"),
+            pk=edit_id
+        )
+
+        edit_items = edit_invoice.items.all()
+
+    # Purchase invoice listing
+    invoices = PurchaseInvoice.objects.select_related(
+        "vendor"
+    ).order_by("-invoice_date", "-id")
+
+    # Filters
+    invoice_number_filter = request.GET.get("invoice_number", "").strip()
+    vendor_filter = request.GET.get("vendor", "").strip()
+    date_from = request.GET.get("date_from", "").strip()
+    date_to = request.GET.get("date_to", "").strip()
+
+    if invoice_number_filter:
+        invoices = invoices.filter(
+            invoice_number__icontains=invoice_number_filter
+        )
+
+    if vendor_filter:
+        invoices = invoices.filter(
+            vendor__name__icontains=vendor_filter
+        )
+
+    if date_from:
+        invoices = invoices.filter(invoice_date__gte=date_from)
+
+    if date_to:
+        invoices = invoices.filter(invoice_date__lte=date_to)
+
+    # Pagination
+    per_page = request.GET.get("per_page", "10")
+
+    if per_page not in ["10", "20", "50"]:
+        per_page = "10"
+
+    paginator = Paginator(invoices, int(per_page))
+    page_number = request.GET.get("page", 1)
+    page_obj = paginator.get_page(page_number)
+
+    # Products for invoice form
     products = Product.objects.all().order_by("category", "item_code")
-    product_categories = sorted({product.category for product in products if product.category})
-    products_json = []
-    
+    product_categories = sorted({
+        product.category for product in products if product.category
+    })
+
     products_json = []
 
     for product in products:
-
         try:
             stock = product.stock
             available_stock = stock.quantity_available
@@ -2175,13 +2422,33 @@ def purchases_invoices(request):
             "selling_price": float(product.selling_price or 0),
             "available_stock": available_stock,
         })
+
     context = {
-        "invoices": invoices,
-        "vendors": Vendor.objects.all().order_by("name"),
+        "invoices": page_obj,
+        "page_obj": page_obj,
         "products": products,
         "products_json": products_json,
         "product_categories": product_categories,
+
+        "vendors": list(
+            Vendor.objects.all().values(
+                "id",
+                "vendor_code",
+                "name",
+                "pan",
+                "mobile",
+            )
+        ),
+
+        "invoice_number_filter": invoice_number_filter,
+        "vendor_filter": vendor_filter,
+        "date_from": date_from,
+        "date_to": date_to,
+        "per_page": per_page,
+        "edit_invoice": edit_invoice,
+        "edit_items": edit_items,
     }
+
     return render(request, "purchase_invoices.html", context)
 
 @login_required

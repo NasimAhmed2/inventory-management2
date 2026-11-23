@@ -155,32 +155,42 @@ class InventoryService:
         quantity,
         unit_cost,
         document_number,
+        reference_id=None,
         user=None,
         remarks="",
     ):
+        return InventoryService._record_movement(
+            product=product,
+            movement_type=InventoryMovement.PURCHASE,
+            quantity=quantity,
+            from_location=InventoryMovement.VENDOR,
+            to_location=InventoryMovement.WAREHOUSE,
+            unit_cost=unit_cost,
+            document_number=document_number,
+            reference_type="Purchase",
+            reference_id=reference_id,
+            remarks=remarks,
+            user=user,
+        )
+
+    # ----------------------------------------------------------
+    # Reversal of Purchase (used during invoice editing)
+    # ----------------------------------------------------------
+    @staticmethod
+    def reverse_purchase(*, movement, document_number, user=None):
 
         return InventoryService._record_movement(
-
-            product=product,
-
-            movement_type=InventoryMovement.PURCHASE,
-
-            quantity=quantity,
-
-            from_location=InventoryMovement.VENDOR,
-
-            to_location=InventoryMovement.WAREHOUSE,
-
-            unit_cost=unit_cost,
-
+            product=movement.product,
+            movement_type=InventoryMovement.PURCHASE_RETURN,
+            quantity=movement.quantity,
+            from_location=InventoryMovement.WAREHOUSE,
+            to_location=InventoryMovement.VENDOR,
+            unit_cost=movement.unit_cost,
             document_number=document_number,
-
-            reference_type="Purchase",
-
-            remarks=remarks,
-
+            reference_type="PurchaseEditReversal",
+            reference_id=movement.pk,
+            remarks="Reversal of purchase movement during invoice editing",
             user=user,
-
         )
 
     # ----------------------------------------------------------
@@ -812,10 +822,14 @@ class CustomerService:
 
     @staticmethod
     def create_customer(request):
-
+        
         return Customer.objects.create(
 
             customer_code=request.POST.get("customer_code") or CustomerService.generate_customer_code(),
+
+            customer_type=request.POST.get("customer_type"),
+
+            pan_number=request.POST.get("pan_number"),
 
             name=request.POST.get("name"),
 
@@ -845,10 +859,16 @@ class CustomerService:
 
     @staticmethod
     def update_customer(customer_id, request):
-
+        print("----- ALL POST DATA -----")  
+        for key, value in request.POST.items():
+            print(f"{key}: {value}")
         customer = Customer.objects.get(
             pk=customer_id
         )
+
+        customer.customer_type = request.POST.get("customer_type")
+
+        customer.pan_number = request.POST.get("pan_number")
 
         customer.name = request.POST.get("name")
 

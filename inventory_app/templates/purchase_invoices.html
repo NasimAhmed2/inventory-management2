@@ -1,3 +1,4 @@
+
 {% extends 'base.html' %}
 {% load static %}
 
@@ -7,36 +8,108 @@
 <div class="card shadow-sm mb-4">
     <div class="card-body">
         <h5 class="card-title">Create Purchase Invoice</h5>
-        <form method="post" enctype="multipart/form-data">
+
+        <form method="post" enctype="multipart/form-data" id="purchase-invoice-form">
             {% csrf_token %}
+
+            <input
+                type="hidden"
+                name="invoice_id"
+                value="{{ edit_invoice.id|default:'' }}"
+            >
+
             <div class="row g-3">
-                <div class="col-md-4">
+
+                <!-- Vendor -->
+                <div class="col-md-3">
                     <label class="form-label">Vendor</label>
-                    <select class="form-select" name="vendor" required>
-                        <option value="">Select vendor</option>
-                        {% for vendor in vendors %}
-                        <option value="{{ vendor.id }}">{{ vendor.vendor_code }} - {{ vendor.name }}</option>
-                        {% endfor %}
-                    </select>
+
+                    <div class="position-relative">
+                        <input
+                            type="text"
+                            class="form-control"
+                            id="vendor-search"
+                            placeholder="Search vendor name, code or PAN..."
+                            autocomplete="off"
+                            value="{{ edit_invoice.vendor.name|default:'' }}"
+                            required
+                        >
+
+                        <input
+                            type="hidden"
+                            name="vendor"
+                            id="vendor-id"
+                            value="{{ edit_invoice.vendor_id|default:'' }}"
+                        >
+
+                        <div
+                            id="vendor-suggestions"
+                            class="list-group position-absolute w-100 shadow-sm"
+                            style="display:none; z-index:9999; max-height:240px; overflow-y:auto;"
+                        ></div>
+                    </div>
                 </div>
+
+                <!-- Invoice Number -->
+                <div class="col-md-2">
+                    <label class="form-label">Invoice Number</label>
+                    <input
+                        type="text"
+                        class="form-control"
+                        name="invoice_number"
+                        placeholder="Enter invoice number"
+                        value="{{ edit_invoice.invoice_number|default:'' }}"
+                        required
+                    >
+                </div>
+
+                <!-- Invoice Date -->
                 <div class="col-md-3">
                     <label class="form-label">Invoice Date</label>
-                    <input type="date" class="form-control" name="invoice_date" required>
+                    <input
+                        type="date"
+                        class="form-control"
+                        name="invoice_date"
+                        value="{{ edit_invoice.invoice_date|date:'Y-m-d' }}"
+                        required
+                    >
                 </div>
-                <div class="col-md-3">
+
+                <!-- Credit Period -->
+                <div class="col-md-2">
                     <label class="form-label">Credit Period</label>
-                    <input type="number" class="form-control" name="credit_period" value="0">
+                    <input
+                        type="number"
+                        class="form-control"
+                        name="credit_period"
+                        value="{{ edit_invoice.credit_period|default:0 }}"
+                    >
                 </div>
+
+                <!-- PDF -->
                 <div class="col-md-2">
                     <label class="form-label">PDF</label>
-                    <input type="file" class="form-control" name="pdf_file" accept="application/pdf">
+                    <input
+                        type="file"
+                        class="form-control"
+                        name="pdf_file"
+                        accept="application/pdf"
+                    >
+
+                    {% if edit_invoice.pdf_path %}
+                        <small class="text-muted">
+                            Existing PDF:
+                            <a href="{% url 'purchase_invoice_pdf' edit_invoice.id %}"
+                            target="_blank">View PDF</a>
+                        </small>
+                    {% endif %}
                 </div>
+
             </div>
 
-            
+            <!-- Items -->
             <div class="mt-4">
-
-                <div>
+                <div class="table-responsive">
                     <table class="table table-bordered align-middle" id="itemsTable">
 
                         <thead class="table-light">
@@ -48,7 +121,9 @@
                                 <th width="120">HSN</th>
                                 <th width="90">Qty</th>
                                 <th width="120">Rate</th>
-                                <th width="120">S. Rate</th>
+                                <th width="100">VAT Rate (%)</th>
+                                <th width="120">Total VAT</th>
+                                <th width="120">MRP</th>
                                 <th width="130">Line Total</th>
                                 <th width="50"></th>
                             </tr>
@@ -56,162 +131,230 @@
 
                         <tbody id="purchase-items-body">
 
-                            <tr class="purchase-item-row">
+                            {% if edit_invoice %}
 
-                                <!-- Product Search -->
-                                <td>
-                                    <div class="position-relative">
+                                {% for item in edit_items %}
 
+                                <tr class="purchase-item-row">
+
+                                    <td>
+                                        <div class="position-relative">
+                                            <input
+                                                type="text"
+                                                class="form-control item-search"
+                                                placeholder="Search code or product name..."
+                                                autocomplete="off"
+                                                value="{{ item.item_code }} - {{ item.item_name }}"
+                                                required
+                                            >
+
+                                            <div
+                                                class="item-suggestions list-group position-absolute w-100 shadow-sm"
+                                                style="display:none; z-index:9999; max-height:240px; overflow-y:auto;"
+                                            ></div>
+                                        </div>
+
+                                        <input type="hidden" name="product_id[]" class="item-product-id">
+                                        <input type="hidden" name="item_category[]" class="item-category">
+
+                                    </td>
+
+                                    <td>
                                         <input
                                             type="text"
-                                            class="form-control item-search"
-                                            placeholder="Search code or product name..."
-                                            autocomplete="off"
+                                            class="form-control item-code"
+                                            name="item_code[]"
+                                            value="{{ item.item_code }}"
+                                            readonly
+                                        >
+                                    </td>
+
+                                    <td>
+                                        <input
+                                            type="text"
+                                            class="form-control item-name"
+                                            name="item_name[]"
+                                            value="{{ item.item_name }}"
+                                            readonly
+                                        >
+                                    </td>
+
+                                    <td>
+                                        <input
+                                            type="text"
+                                            class="form-control item-spec"
+                                            name="item_specification[]"
+                                            value="{{ item.specification }}"
+                                            readonly
+                                        >
+                                    </td>
+
+                                    <td>
+                                        <input
+                                            type="text"
+                                            class="form-control hsn"
+                                            name="hsn[]"
+                                            value="{{ item.hs_code }}"
+                                            readonly
+                                        >
+                                    </td>
+
+                                    <td>
+                                        <input
+                                            type="number"
+                                            class="form-control quantity"
+                                            name="quantity[]"
+                                            value="{{ item.quantity }}"
+                                            min="1"
+                                            step="1"
                                             required
                                         >
+                                    </td>
 
-                                        <div
-                                            class="item-suggestions list-group position-absolute w-100 shadow-sm"
-                                            style="
-                                                display:none;
-                                                z-index:9999;
-                                                max-height:240px;
-                                                overflow-y:auto;
-                                            "
-                                        ></div>
+                                    <td>
+                                        <input
+                                            type="number"
+                                            class="form-control rate"
+                                            name="rate[]"
+                                            value="{{ item.rate }}"
+                                            min="0"
+                                            step="0.01"
+                                            required
+                                        >
+                                    </td>
 
-                                    </div>
+                                    <td>
+                                        <input
+                                            type="number"
+                                            class="form-control vat-rate"
+                                            name="vat_rate[]"
+                                            value="{{ item.tax_percentage|default:13 }}"
+                                            min="0"
+                                            step="0.01"
+                                            required
+                                        >
+                                    </td>
 
-                                    <!-- Hidden product ID -->
-                                    <input
-                                        type="hidden"
-                                        name="product_id[]"
-                                        class="item-product-id"
-                                    >
+                                    <td>
+                                        <input
+                                            type="text"
+                                            class="form-control total-vat"
+                                            name="total_vat[]"
+                                            value="{{ item.tax_amount|default:0 }}"
+                                            readonly
+                                        >
+                                    </td>
 
-                                    <!-- Hidden category -->
-                                    <input
-                                        type="hidden"
-                                        name="item_category[]"
-                                        class="item-category"
-                                    >
-                                </td>
+                                    <td>
+                                        <input
+                                            type="number"
+                                            class="form-control selling_rate"
+                                            name="selling_rate[]"
+                                            value="0"
+                                            min="0"
+                                            step="0.01"
+                                            required
+                                        >
+                                    </td>
 
+                                    <td>
+                                        <input
+                                            type="text"
+                                            class="form-control line-total"
+                                            value="{{ item.line_total }}"
+                                            readonly
+                                        >
+                                    </td>
 
-                                <!-- Item Code -->
-                                <td>
-                                    <input
-                                        type="text"
-                                        class="form-control item-code"
-                                        name="item_code[]"
-                                        readonly
-                                    >
-                                </td>
+                                    <td class="text-center">
+                                        <button
+                                            type="button"
+                                            class="btn btn-sm btn-outline-danger remove-purchase-item"
+                                            title="Remove Item"
+                                        >
+                                            <i class="fas fa-trash"></i>
+                                        </button>
+                                    </td>
 
+                                </tr>
 
-                                <!-- Item Name -->
-                                <td>
-                                    <input
-                                        type="text"
-                                        class="form-control item-name"
-                                        name="item_name[]"
-                                        readonly
-                                    >
-                                </td>
+                                {% endfor %}
 
+                            {% else %}
 
-                                <!-- Specification -->
-                                <td>
-                                    <input
-                                        type="text"
-                                        class="form-control item-spec"
-                                        name="item_specification[]"
-                                        readonly
-                                    >
-                                </td>
+                                <tr class="purchase-item-row">
 
-                                <!-- HSN -->
-                                <td>
-                                    <input
-                                        type="text"
-                                        class="form-control hsn"
-                                        name="hsn[]"
-                                        readonly
-                                    >
-                                </td>
+                                    <td>
+                                        <div class="position-relative">
+                                            <input
+                                                type="text"
+                                                class="form-control item-search"
+                                                placeholder="Search code or product name..."
+                                                autocomplete="off"
+                                                required
+                                            >
 
+                                            <div
+                                                class="item-suggestions list-group position-absolute w-100 shadow-sm"
+                                                style="display:none; z-index:9999; max-height:240px; overflow-y:auto;"
+                                            ></div>
+                                        </div>
 
-                                <!-- Quantity -->
-                                <td>
-                                    <input
-                                        type="number"
-                                        class="form-control quantity"
-                                        name="quantity[]"
-                                        value="1"
-                                        min="1"
-                                        step="1"
-                                        required
-                                    >
-                                </td>
+                                        <input type="hidden" name="product_id[]" class="item-product-id">
+                                        <input type="hidden" name="item_category[]" class="item-category">
+                                    </td>
 
+                                    <td>
+                                        <input type="text" class="form-control item-code" name="item_code[]" readonly>
+                                    </td>
 
-                                <!-- Rate -->
-                                <td>
-                                    <input
-                                        type="number"
-                                        class="form-control rate"
-                                        name="rate[]"
-                                        value="0"
-                                        min="0"
-                                        step="0.01"
-                                        required
-                                    >
-                                </td>
+                                    <td>
+                                        <input type="text" class="form-control item-name" name="item_name[]" readonly>
+                                    </td>
 
-                                <!-- Selling Rate -->
-                                <td>
-                                    <input
-                                        type="number"
-                                        class="form-control selling_rate"
-                                        name="selling_rate[]"
-                                        value="0"
-                                        min="0"
-                                        step="0.01"
-                                        required
-                                    >
-                                </td>
+                                    <td>
+                                        <input type="text" class="form-control item-spec" name="item_specification[]" readonly>
+                                    </td>
 
+                                    <td>
+                                        <input type="text" class="form-control hsn" name="hsn[]" readonly>
+                                    </td>
 
-                                <!-- Line Total -->
-                                <td>
-                                    <input
-                                        type="text"
-                                        class="form-control line-total"
-                                        readonly
-                                    >
-                                </td>
+                                    <td>
+                                        <input type="number" class="form-control quantity" name="quantity[]" value="1" min="1" step="1" required>
+                                    </td>
 
+                                    <td>
+                                        <input type="number" class="form-control rate" name="rate[]" value="0" min="0" step="0.01" required>
+                                    </td>
 
-                                
+                                    <td>
+                                        <input type="number" class="form-control vat-rate" name="vat_rate[]" value="13" min="0" step="0.01" required>
+                                    </td>
 
+                                    <td>
+                                        <input type="text" class="form-control total-vat" name="total_vat[]" value="0.00" readonly>
+                                    </td>
 
-                                <!-- Remove -->
-                                <td class="text-center">
+                                    <td>
+                                        <input type="number" class="form-control selling_rate" name="selling_rate[]" value="0" min="0" step="0.01" required>
+                                    </td>
 
-                                    <button
-                                        type="button"
-                                        class="btn btn-sm btn-outline-danger remove-purchase-item"
-                                        title="Remove Item"
-                                    >
-                                        <i class="fas fa-trash"></i>
-                                    </button>
+                                    <td>
+                                        <input type="text" class="form-control line-total" readonly>
+                                    </td>
 
-                                </td>
+                                    <td class="text-center">
+                                        <button type="button" class="btn btn-sm btn-outline-danger remove-purchase-item">
+                                            <i class="fas fa-trash"></i>
+                                        </button>
+                                    </td>
 
-                            </tr>
+                                </tr>
+
+                            {% endif %}
 
                         </tbody>
-
                     </table>
                 </div>
 
@@ -222,20 +365,35 @@
                 >
                     Add Item
                 </button>
-
             </div>
 
-
-
+            <!-- Narration -->
             <div class="mt-4">
                 <label class="form-label">Narration</label>
-                <textarea class="form-control" name="narration"></textarea>
+                <textarea
+                    class="form-control"
+                    name="narration"
+                >{{ edit_invoice.narration|default:'' }}</textarea>
             </div>
 
+            <!-- Total and Submit -->
             <div class="mt-4 d-flex justify-content-between align-items-center">
-                <h5 class="mb-0">Invoice Total: <span id="invoiceTotal">0.00</span></h5>
-                <button type="submit" class="btn btn-primary">Create GRN</button>
+
+                <h5 class="mb-0">
+                    Invoice Total:
+                    <span id="invoiceTotal">0.00</span>
+                </h5>
+
+                <button type="submit" class="btn btn-primary">
+                    {% if edit_invoice %}
+                        Update Invoice
+                    {% else %}
+                        Create GRN
+                    {% endif %}
+                </button>
+
             </div>
+
         </form>
     </div>
 </div>
@@ -243,8 +401,80 @@
 <div class="card shadow-sm">
     <div class="card-body">
         <h5 class="card-title">Purchase Invoice Records</h5>
+
+        <div class="card shadow-sm mb-3">
+            <div class="card-body">
+
+                <form method="GET" action="{% url 'purchases_invoices' %}">
+
+                    <div class="row g-3 align-items-end">
+
+                        <div class="col-md-3">
+                            <label class="form-label">Invoice Number</label>
+                            <input
+                                type="text"
+                                name="invoice_number"
+                                class="form-control"
+                                placeholder="Search invoice number"
+                                value="{{ invoice_number_filter }}"
+                            >
+                        </div>
+
+                        <div class="col-md-3">
+                            <label class="form-label">Vendor</label>
+                            <input
+                                type="text"
+                                name="vendor"
+                                class="form-control"
+                                placeholder="Search vendor name"
+                                value="{{ vendor_filter }}"
+                            >
+                        </div>
+
+                        <div class="col-md-2">
+                            <label class="form-label">From Date</label>
+                            <input
+                                type="date"
+                                name="date_from"
+                                class="form-control"
+                                value="{{ date_from }}"
+                            >
+                        </div>
+
+                        <div class="col-md-2">
+                            <label class="form-label">To Date</label>
+                            <input
+                                type="date"
+                                name="date_to"
+                                class="form-control"
+                                value="{{ date_to }}"
+                            >
+                        </div>
+
+                        <div class="col-md-2 d-flex gap-2">
+                            <button type="submit" class="btn btn-primary">
+                                Apply
+                            </button>
+
+                            <a
+                                href="{% url 'purchases_invoices' %}"
+                                class="btn btn-outline-secondary"
+                            >
+                                Clear
+                            </a>
+                        </div>
+
+                    </div>
+
+                    <input type="hidden" name="per_page" value="{{ per_page }}">
+
+                </form>
+
+            </div>
+        </div>
+
         <div class="table-responsive">
-            <table class="table table-striped">
+            <table class="table table-striped align-middle">
                 <thead>
                     <tr>
                         <th>Invoice #</th>
@@ -252,41 +482,117 @@
                         <th>Date</th>
                         <th>Grand Total</th>
                         <th>PDF</th>
+                        <th>Action</th>
                     </tr>
                 </thead>
+
                 <tbody>
                     {% for invoice in invoices %}
                     <tr>
                         <td>{{ invoice.invoice_number }}</td>
                         <td>{{ invoice.vendor.name }}</td>
-                        <td>{{ invoice.invoice_date }}</td>
+                        <td>{{ invoice.invoice_date|date:"d-m-Y" }}</td>
                         <td>{{ invoice.grand_total }}</td>
+
                         <td>
                             {% if invoice.pdf_path %}
-                            <a class="btn btn-sm btn-outline-primary" href="{% url 'purchase_invoice_pdf' invoice.id %}" target="_blank">View PDF</a>
+                                <a
+                                    class="btn btn-sm btn-outline-primary"
+                                    href="{% url 'purchase_invoice_pdf' invoice.id %}"
+                                    target="_blank"
+                                >
+                                    View PDF
+                                </a>
                             {% else %}
-                            <span class="text-muted">No PDF</span>
+                                <span class="text-muted">No PDF</span>
                             {% endif %}
                         </td>
+
+                        <td>
+                            <a
+                                href="{% url 'purchases_invoices' %}?edit={{ invoice.id }}"
+                                class="btn btn-sm btn-outline-primary"
+                            >
+                                <i class="bi bi-pencil-square"></i> Edit
+                            </a>
+                        </td>
                     </tr>
+
                     {% empty %}
-                    <tr><td colspan="5" class="text-center text-muted">No purchase invoices yet.</td></tr>
+                    <tr>
+                        <td colspan="6" class="text-center text-muted py-4">
+                            No purchase invoices found.
+                        </td>
+                    </tr>
                     {% endfor %}
                 </tbody>
             </table>
+        </div>
+
+        <!-- Pagination -->
+        <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mt-3">
+
+            <div class="text-muted small">
+                Showing
+                {% if page_obj.paginator.count %}
+                    {{ page_obj.start_index }} to {{ page_obj.end_index }}
+                {% else %}
+                    0 to 0
+                {% endif %}
+                of {{ page_obj.paginator.count }} invoices
+            </div>
+
+            <nav>
+                <ul class="pagination pagination-sm mb-0">
+
+                    <!-- Previous -->
+                    {% if page_obj.has_previous %}
+                        <li class="page-item">
+                            <a class="page-link"
+                            href="?{% for key, value in request.GET.items %}{% if key != 'page' %}{{ key }}={{ value|urlencode }}&{% endif %}{% endfor %}page={{ page_obj.previous_page_number }}">
+                                Previous
+                            </a>
+                        </li>
+                    {% else %}
+                        <li class="page-item disabled">
+                            <span class="page-link">Previous</span>
+                        </li>
+                    {% endif %}
+
+                    <!-- Page numbers -->
+                    {% for num in page_obj.paginator.page_range %}
+                        <li class="page-item {% if page_obj.number == num %}active{% endif %}">
+                            <a class="page-link"
+                            href="?{% for key, value in request.GET.items %}{% if key != 'page' %}{{ key }}={{ value|urlencode }}&{% endif %}{% endfor %}page={{ num }}">
+                                {{ num }}
+                            </a>
+                        </li>
+                    {% endfor %}
+
+                    <!-- Next -->
+                    {% if page_obj.has_next %}
+                        <li class="page-item">
+                            <a class="page-link"
+                            href="?{% for key, value in request.GET.items %}{% if key != 'page' %}{{ key }}={{ value|urlencode }}&{% endif %}{% endfor %}page={{ page_obj.next_page_number }}">
+                                Next
+                            </a>
+                        </li>
+                    {% else %}
+                        <li class="page-item disabled">
+                            <span class="page-link">Next</span>
+                        </li>
+                    {% endif %}
+
+                </ul>
+            </nav>
+
         </div>
     </div>
 </div>
 
 {{ products_json|json_script:"products-data" }}
-<script>
-    const products = JSON.parse(
-        document.getElementById("products-data").textContent
-    );
+{{ vendors|json_script:"vendors-data" }}
 
-    console.log("Products JSON:", products);
-    console.table(products);
-</script>
 <script src="{% static 'js/purchase_invoice.js' %}"></script>
 
 {% endblock %}

@@ -139,6 +139,7 @@
                                     data-id="{{ customer.id }}"
                                     data-code="{{ customer.customer_code }}"
                                     data-type="{{ customer.customer_type }}"
+                                    data-pan="{{ customer.pan_number }}"
                                     data-name="{{ customer.name }}"
                                     data-mobile="{{ customer.mobile }}"
                                     data-email="{{ customer.email }}"
@@ -452,19 +453,11 @@
 
                     <div class="row">
 
-                        <div class="col-md-6">
-
-                            <label>Customer Code</label>
-
-                            <input
-                                class="form-control"
-                                name="customer_code"
-                                id="customer_code"
-                                required
-                                readonly
-                            >
-
-                        </div>
+                        <input
+                            type="hidden"
+                            name="customer_code"
+                            id="customer_code"
+                        >
 
                         <div class="col-md-6">
 
@@ -474,11 +467,27 @@
                                 class="form-select"
                                 name="customer_type"
                                 id="customer_type"
+                                required
                             >
                                 <option value="consumer">Consumer</option>
                                 <option value="retailer">Retailer</option>
                                 <option value="wholesaler">Wholesaler</option>
                             </select>
+
+                        </div>
+
+                        <div class="col-md-6">
+
+                            <label>PAN Number</label>
+
+                            <input
+                                type="text"
+                                class="form-control"
+                                name="pan_number"
+                                id="pan_number"
+                                maxlength="10"
+                                style="text-transform: uppercase;"
+                            >
 
                         </div>
 
@@ -652,6 +661,8 @@ document.addEventListener("DOMContentLoaded", function () {
 
             document.getElementById("customer_type").value=this.dataset.type;
 
+            document.getElementById("pan_number").value=this.dataset.pan;
+
             document.getElementById("name").value=this.dataset.name;
 
             document.getElementById("mobile").value=this.dataset.mobile;
@@ -673,6 +684,31 @@ document.addEventListener("DOMContentLoaded", function () {
     });
 
 });
+
+const customerType = document.getElementById("customer_type");
+const panNumber = document.getElementById("pan_number");
+const mobileNumber = document.getElementById("mobile");
+
+function updateCustomerValidation() {
+
+    if (customerType.value === "consumer") {
+
+        mobileNumber.required = true;
+        panNumber.required = false;
+
+    } else {
+
+        mobileNumber.required = false;
+        panNumber.required = true;
+
+    }
+
+}
+
+customerType.addEventListener("change", updateCustomerValidation);
+
+// Set initial validation
+updateCustomerValidation();
 
 // ==================================================
 // AUTO-GENERATE CUSTOMER CODE

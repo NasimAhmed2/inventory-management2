@@ -545,6 +545,7 @@ class InventoryMovement(models.Model):
             f"{self.quantity}"
 
         )
+    
 class BatchTracking(models.Model):
     product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name='batches')
     batch_number = models.CharField(max_length=100)
@@ -577,6 +578,7 @@ class Customer(models.Model):
     customer_code = models.CharField(max_length=50, unique=True)
     customer_type = models.CharField(default='consumer', choices=CUSTOMER_TYPE_CHOICES)
     name = models.CharField(max_length=255)
+    pan_number = models.CharField(max_length=10, blank=True, null=True)
     mobile = models.CharField(max_length=20, blank=True)
     email = models.EmailField(blank=True)
     address = models.TextField(blank=True)
