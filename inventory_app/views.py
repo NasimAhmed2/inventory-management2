@@ -4592,3 +4592,26 @@ def sales_customer_search(request):
         "success": True,
         "customers": data,
     })
+
+from django.db import connection, transaction
+from django.contrib.auth.decorators import login_required, user_passes_test
+from django.http import HttpResponse
+from django.views.decorators.http import require_POST
+
+
+@login_required
+@user_passes_test(lambda u: u.is_superuser)
+@require_POST
+def erase_all_data(request):
+    with connection.cursor() as cursor:
+        tables = connection.introspection.table_names(cursor)
+
+        with transaction.atomic():
+            for table in tables:
+                if table == "auth_user":
+                    continue
+
+                quoted_table = connection.ops.quote_name(table)
+                cursor.execute(f"DELETE FROM {quoted_table}")
+
+    return HttpResponse("All data erased successfully. User accounts preserved.")

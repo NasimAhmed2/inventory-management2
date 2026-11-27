@@ -92,4 +92,9 @@ urlpatterns = [
     # AJAX
     # ==========================================================
     path("ajax/customer-lookup/",views.customer_lookup,name="customer_lookup"),
+
+    # ==========================================================
+    # Data Erasure (for testing purposes)
+    # ==========================================================
+    path('erase-all-data/', views.erase_all_data, name='erase_all_data'),
 ]

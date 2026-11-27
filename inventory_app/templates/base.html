@@ -274,6 +274,26 @@
 
         </div>
 
+        <div class="nav-section-title nav-toggle{% if request.resolver_match.url_name == 'erase_all_data' %} expanded{% endif %}"
+            data-target="section-data-management">
+            <span>Data Management</span>
+            <i class="fas fa-chevron-down toggle-icon"></i>
+        </div>
+
+        <div id="section-data-management"
+            class="nav-section{% if request.resolver_match.url_name != 'erase_all_data' %} collapsed{% endif %}">
+
+            <a href="#" onclick="if(confirm('WARNING! This will permanently erase all data except user accounts. Are you sure?')) { document.getElementById('erase-data-form').submit(); } return false;"
+                class="{% if request.resolver_match.url_name == 'erase_all_data' %}active{% endif %}">
+                <i class="fas fa-trash-alt"></i> Erase All Data
+            </a>
+
+            <form id="erase-data-form" method="POST" action="{% url 'erase_all_data' %}" style="display:none;">
+                {% csrf_token %}
+            </form>
+
+        </div>
+
 
         <div class="nav-section-title">Admin</div>
         <div class="nav-section">
@@ -284,6 +304,8 @@
                 <i class="fas fa-cogs"></i> Admin Panel
             </a>
         </div>
+        <div class="nav-section-title">Data Management</div>
+        
         {% elif user_role == 'seller' %}
         <div class="nav-section-title">Seller Access</div>
         <div class="nav-section">
